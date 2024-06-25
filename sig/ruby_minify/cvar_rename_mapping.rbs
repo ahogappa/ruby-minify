@@ -1,0 +1,17 @@
+module RubyMinify
+  class CvarRenameMapping
+    def initialize: () -> void
+    def add_read_site: (Array[Symbol] cpath, Symbol cvar_name, untyped node) -> void
+    def add_write_site: (Array[Symbol] cpath, Symbol cvar_name, untyped node) -> void
+    def exclude_cpath: (Array[Symbol] cpath) -> void
+    def each_canonical_cpath: () { (Array[Symbol]) -> void } -> void
+    def merge_with_ancestor: (Array[Symbol] child_cpath, Array[Symbol] ancestor_cpath) -> void
+    def assign_short_names: () -> void
+    def node_mapping: () -> Hash[[Integer, Integer], String]
+
+    private
+
+    def resolve_canonical: (Array[Symbol] cpath) -> Array[Symbol]
+    def cvar_entry: (Array[Symbol] cpath, Symbol cvar_name) -> Hash[Symbol, Array[untyped]]
+  end
+end

@@ -1,0 +1,106 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'optparse'
+require_relative '../lib/ruby_minify'
+
+options = {
+  output: nil,
+  aliases: nil,
+  level: nil
+}
+
+parser = OptionParser.new do |opts|
+  opts.banner = "Usage: minify [options] FILE..."
+
+  opts.on("-o", "--output FILE", "Write output to FILE instead of stdout") do |file|
+    options[:output] = file
+  end
+
+  opts.on("-a", "--aliases FILE", "Write constant alias declarations to FILE") do |file|
+    options[:aliases] = file
+  end
+
+  opts.on("-c", "--compress LEVEL", "Set compression level (0-5, stable, unstable)") do |value|
+    begin
+      options[:level] = RubyMinify::Minifier.resolve_level(value)
+    rescue ArgumentError => e
+      warn "Error: #{e.message}"
+      warn opts
+      exit 1
+    end
+  end
+
+  opts.on("-h", "--help", "Display this help message") do
+    puts opts
+    exit 0
+  end
+
+  opts.on("-v", "--version", "Display version") do
+    puts "ruby-minify version #{RubyMinify::VERSION}"
+    exit 0
+  end
+end
+
+begin
+  parser.parse!
+rescue OptionParser::InvalidOption => e
+  warn "Error: #{e.message}"
+  warn parser
+  exit 1
+end
+
+if ARGV.empty?
+  warn "Error: No entry file specified"
+  warn parser
+  exit 1
+end
+
+ARGV.each do |file|
+  unless File.exist?(file)
+    warn "Error: File not found: #{file}"
+    exit 1
+  end
+end
+
+entry = ARGV.size == 1 ? ARGV[0] : ARGV.dup
+
+begin
+  minifier = RubyMinify::Minifier.new
+  level_opts = options[:level] ? { level: options[:level] } : {}
+  result = minifier.call(entry, **level_opts)
+
+  content = if options[:aliases]
+    File.write(options[:aliases], result.aliases)
+    result.content
+  elsif !result.aliases.empty?
+    "#{result.content};#{result.aliases}"
+  else
+    result.content
+  end
+
+  if options[:output]
+    File.write(options[:output], content)
+  else
+    puts content
+  end
+
+  warn "Compression: #{((1 - result.stats.compression_ratio) * 100).round(1)}%"
+  warn "Files processed: #{result.stats.file_count}"
+rescue RubyMinify::SyntaxError => e
+  warn "Error: Syntax error"
+  warn "  #{e.message}"
+  exit 2
+rescue RubyMinify::MinifyError => e
+  warn "Error: Minification error"
+  warn "  #{e.message}"
+  exit 2
+rescue RubyMinify::Pipeline::StageError => e
+  warn "Error: Pipeline error"
+  warn "  #{e.message}"
+  exit 2
+rescue => e
+  warn "Error: Internal error during minification"
+  warn "  #{e.message}"
+  exit 3
+end

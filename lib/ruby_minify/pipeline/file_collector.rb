@@ -1,0 +1,275 @@
+# frozen_string_literal: true
+
+require 'prism'
+
+module RubyMinify
+  module Pipeline
+    # Stage 1: File Collection
+    # Discovers all dependencies via static analysis of require/require_relative/autoload
+    class FileCollector < Stage
+      # @param entry_path [String, Array<String>] Path(s) to entry point file(s)
+      # @return [DependencyGraph] Graph of all discovered files
+      # @raise [FileNotFoundError] If a required file doesn't exist
+      # @raise [NoFilesError] If entry_path is nil or empty
+      # @raise [DynamicRequireError] If a dynamic require is detected
+      def call(entry_path)
+        raise NoFilesError.new if entry_path.nil?
+
+        entry_paths = Array(entry_path)
+        raise NoFilesError.new if entry_paths.empty?
+
+        @graph = DependencyGraph.new
+        @visited = Set.new
+        @project_root = find_project_root(entry_paths)
+
+        entry_paths.each do |path|
+          expanded = File.expand_path(path)
+          raise FileNotFoundError.new(expanded) unless File.exist?(expanded)
+          collect_file(expanded)
+        end
+
+        collect_rbs_files(entry_paths)
+        @graph
+      end
+
+      private
+
+      # Recursively collect a file and its dependencies
+      def collect_file(file_path, required_from: nil, line: nil)
+        return if @visited.include?(file_path)
+
+        unless File.exist?(file_path)
+          raise FileNotFoundError.new(file_path, required_from: required_from, line: line)
+        end
+
+        @visited.add(file_path)
+        content = File.read(file_path)
+
+        # Parse and extract require statements
+        require_nodes = extract_require_nodes(file_path, content)
+        dependencies = []
+        in_class_dependencies = []
+
+        require_nodes.each do |node_info|
+          dep_path = node_info[:resolved_path]
+          next unless dep_path
+
+          if node_info[:in_class]
+            in_class_dependencies << dep_path
+          else
+            dependencies << dep_path
+          end
+          collect_file(dep_path, required_from: file_path, line: node_info[:line])
+        end
+
+        entry = FileEntry.new(
+          path: file_path,
+          content: content,
+          dependencies: dependencies,
+          in_class_dependencies: in_class_dependencies,
+          require_nodes: require_nodes
+        )
+
+        @graph.add_file(entry)
+      end
+
+      # Extract require/require_relative/autoload nodes from source
+      def extract_require_nodes(file_path, content)
+        result = Prism.parse(content)
+        nodes = []
+
+        traverse_for_requires(result.value, nodes, file_path)
+
+        nodes
+      end
+
+      # Traverse AST to find require statements
+      # @param in_method [Boolean] true when inside a DefNode body; dynamic requires are skipped
+      def traverse_for_requires(node, nodes, file_path, in_method: false, in_class: false)
+        return unless node
+
+        case node
+        when Prism::CallNode
+          handle_call_node(node, nodes, file_path, in_method: in_method, in_class: in_class)
+        when Prism::ProgramNode
+          traverse_for_requires(node.statements, nodes, file_path, in_method: in_method, in_class: in_class)
+        when Prism::StatementsNode
+          node.body.each { |child| traverse_for_requires(child, nodes, file_path, in_method: in_method, in_class: in_class) }
+        when Prism::ClassNode, Prism::ModuleNode
+          traverse_for_requires(node.body, nodes, file_path, in_method: in_method, in_class: true)
+        when Prism::DefNode
+          traverse_for_requires(node.body, nodes, file_path, in_method: true, in_class: in_class)
+        when Prism::IfNode
+          traverse_for_requires(node.statements, nodes, file_path, in_method: in_method, in_class: in_class)
+          traverse_for_requires(node.subsequent, nodes, file_path, in_method: in_method, in_class: in_class)
+        when Prism::BeginNode
+          traverse_for_requires(node.statements, nodes, file_path, in_method: in_method, in_class: in_class)
+        end
+      end
+
+      def handle_call_node(node, nodes, file_path, in_method: false, in_class: false)
+        method_name = node.name
+
+        case method_name
+        when :require_relative
+          handle_require_relative(node, nodes, file_path, in_method: in_method, in_class: in_class)
+        when :require
+          handle_require(node, nodes, file_path, in_method: in_method, in_class: in_class)
+        when :autoload
+          handle_autoload(node, nodes, file_path, in_method: in_method, in_class: in_class)
+        end
+
+        # Continue traversing for nested calls
+        node.arguments&.arguments&.each do |arg|
+          traverse_for_requires(arg, nodes, file_path, in_method: in_method, in_class: in_class)
+        end
+        traverse_for_requires(node.block, nodes, file_path, in_method: in_method, in_class: in_class) if node.block
+      end
+
+      def handle_require_relative(node, nodes, file_path, in_method: false, in_class: false)
+        arg = node.arguments&.arguments&.first
+        return unless arg
+
+        if arg.is_a?(Prism::StringNode)
+          nodes << {
+            type: :require_relative,
+            path: arg.unescaped,
+            line: node.location.start_line,
+            start_offset: node.location.start_offset,
+            length: node.location.length,
+            in_class: in_class,
+            in_method: in_method,
+            resolved_path: resolve_relative_path(arg.unescaped, file_path)
+          }
+        else
+          return if in_method
+
+          raise DynamicRequireError.new(
+            file_path,
+            line: node.location.start_line,
+            expression: node.slice
+          )
+        end
+      end
+
+      def handle_require(node, nodes, file_path, in_method: false, in_class: false)
+        arg = node.arguments&.arguments&.first
+        return unless arg
+
+        if arg.is_a?(Prism::StringNode)
+          path = arg.unescaped
+          if path.start_with?('./', '../')
+            nodes << {
+              type: :require,
+              path: path,
+              line: node.location.start_line,
+              start_offset: node.location.start_offset,
+              length: node.location.length,
+              in_class: in_class,
+              in_method: in_method,
+              resolved_path: resolve_relative_path(path, file_path)
+            }
+          elsif (resolved = resolve_bare_require(path))
+            nodes << {
+              type: :require,
+              path: path,
+              line: node.location.start_line,
+              start_offset: node.location.start_offset,
+              length: node.location.length,
+              in_class: in_class,
+              in_method: in_method,
+              resolved_path: resolved
+            }
+          else
+            nodes << {
+              type: :require_stdlib,
+              path: path,
+              line: node.location.start_line,
+              start_offset: node.location.start_offset,
+              length: node.location.length,
+              in_class: in_class
+            }
+          end
+        else
+          return if in_method
+
+          raise DynamicRequireError.new(
+            file_path,
+            line: node.location.start_line,
+            expression: node.slice
+          )
+        end
+      end
+
+      def handle_autoload(node, nodes, file_path, in_method: false, in_class: false)
+        args = node.arguments&.arguments
+        return unless args && args.size >= 2
+
+        path_arg = args[1]
+
+        if path_arg.is_a?(Prism::StringNode)
+          path = path_arg.unescaped
+          # Treat autoload paths like require_relative for local files
+          if path.start_with?('./', '../') || !path.include?('/')
+            nodes << {
+              type: :autoload,
+              path: path,
+              line: node.location.start_line,
+              start_offset: node.location.start_offset,
+              length: node.location.length,
+              in_class: in_class,
+              in_method: in_method,
+              resolved_path: resolve_relative_path(path, file_path)
+            }
+          end
+        else
+          return if in_method
+
+          raise DynamicRequireError.new(
+            file_path,
+            line: node.location.start_line,
+            expression: node.slice
+          )
+        end
+      end
+
+      def collect_rbs_files(_entry_paths)
+        return unless @project_root
+
+        sig_dir = File.join(@project_root, "sig")
+        return unless File.directory?(sig_dir)
+
+        Dir.glob(File.join(sig_dir, "**", "*.rbs")).each do |path|
+          @graph.rbs_files[path] = File.read(path)
+        end
+      end
+
+      def find_project_root(entry_paths)
+        dir = File.dirname(File.expand_path(entry_paths.first))
+        until dir == "/"
+          return dir if File.exist?(File.join(dir, "Gemfile")) || File.directory?(File.join(dir, ".git"))
+          dir = File.dirname(dir)
+        end
+        nil
+      end
+
+      def resolve_relative_path(path, from_file)
+        path += '.rb' unless path.end_with?('.rb')
+        File.expand_path(path, File.dirname(from_file))
+      end
+
+      # Resolve a bare require path (e.g., "foo") via $LOAD_PATH.
+      # Returns absolute path if the file is under the project root, nil otherwise.
+      def resolve_bare_require(path)
+        result = $LOAD_PATH.resolve_feature_path(path)
+        return nil unless result
+
+        type, abs_path = result
+        return nil unless type == :rb
+        return nil unless @project_root && abs_path.start_with?(@project_root)
+
+        abs_path
+      end
+    end
+  end
+end

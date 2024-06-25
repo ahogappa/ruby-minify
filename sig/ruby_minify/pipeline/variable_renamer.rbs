@@ -1,0 +1,15 @@
+module RubyMinify
+  module Pipeline
+    class VariableRenamer
+      include RenamePatcher
+
+      FEATURES: Hash[Symbol, bool]
+
+      def initialize: (?features: Hash[Symbol, bool]) -> void
+      def call: (String input_string, ?analysis: AnalysisResult?, ?prism_result: untyped?, ?source: ConcatenatedSource?) -> RenameResult
+      def self.collect_patches_from: (Prism::ProgramNode prism_ast, Array[Hash[Symbol, untyped]] patches, AnalysisResult analysis, ?Hash[Symbol, untyped]? kwargs) -> void
+      def self.postprocess: (String result, AnalysisResult analysis, String aliases_str, String preamble_str) -> [String, String, String]
+      def run_collect: (Prism::ProgramNode prism_ast, Array[Hash[Symbol, untyped]] patches, AnalysisResult analysis) -> void
+    end
+  end
+end

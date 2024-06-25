@@ -1,0 +1,26 @@
+module RubyMinify
+  class Minifier
+    DEFAULT_LEVEL: Integer
+    LEVEL_ALIASES: Hash[String, Integer]
+
+    def self.resolve_level: (String value) -> Integer
+
+    OPTIMIZE: Hash[singleton(Pipeline::BooleanShorten) | singleton(Pipeline::CharShorten) | singleton(Pipeline::ConstantFold) | singleton(Pipeline::ControlFlowSimplify) | singleton(Pipeline::EndlessMethod) | singleton(Pipeline::ParenOptimizer), Integer]
+    ALL_VAR_FEATURES: Hash[Symbol, Hash[Symbol, bool]]
+    ALL_VAR_WITH_ATTR: Hash[Symbol, Hash[Symbol, bool]]
+    STAGES: Hash[Integer, Array[Hash[singleton(Pipeline::BooleanShorten) | singleton(Pipeline::CharShorten) | singleton(Pipeline::ConstantFold) | singleton(Pipeline::ControlFlowSimplify) | singleton(Pipeline::EndlessMethod) | singleton(Pipeline::ParenOptimizer), Integer] | [singleton(Pipeline::ConstantAliaser) | singleton(Pipeline::VariableRenamer) | singleton(Pipeline::MethodRenamer)] | [singleton(Pipeline::ConstantAliaser) | singleton(Pipeline::VariableRenamer) | singleton(Pipeline::MethodRenamer), Hash[Symbol, untyped]]]]
+
+    def self.run_stages: (String code, Array[Hash[singleton(Pipeline::BooleanShorten) | singleton(Pipeline::CharShorten) | singleton(Pipeline::ConstantFold) | singleton(Pipeline::ControlFlowSimplify) | singleton(Pipeline::EndlessMethod) | singleton(Pipeline::ParenOptimizer), Integer] | [singleton(Pipeline::ConstantAliaser) | singleton(Pipeline::VariableRenamer) | singleton(Pipeline::MethodRenamer)] | [singleton(Pipeline::ConstantAliaser) | singleton(Pipeline::VariableRenamer) | singleton(Pipeline::MethodRenamer), Hash[Symbol, untyped]]] stages, ?file_boundaries: Array[Pipeline::FileBoundary], ?stdlib_requires: Array[String], ?rbs_files: Hash[String, String]) -> Pipeline::RenameResult
+
+    attr_reader result: Pipeline::MinifiedResult?
+
+    def initialize: () -> void
+    def call: (String | Array[String] entry_path, ?level: Integer) -> Pipeline::MinifiedResult
+
+    private
+
+    def run_pipeline: (Pipeline::ConcatenatedSource source, Integer target_level) -> Pipeline::RenameResult
+    def build_result: (Pipeline::RenameResult rename_result, Pipeline::ConcatenatedSource source) -> Pipeline::MinifiedResult
+    def build_output: (String code, Array[String] stdlib_requires) -> String
+  end
+end

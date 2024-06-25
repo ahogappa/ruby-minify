@@ -1,0 +1,19 @@
+module RubyMinify
+  class GvarRenameMapping
+    BUILT_IN_GLOBALS: Set[Symbol]
+
+    @gvars: Hash[Symbol, Array[untyped]]
+    @excluded_names: Set[Symbol]
+    @node_short_names: Hash[[Integer, Integer], String]
+
+    def initialize: () -> void
+
+    def add_site: (Symbol name, untyped node) -> void
+
+    def exclude_name: (Symbol name) -> void
+
+    def assign_short_names: () -> void
+
+    def node_mapping: () -> Hash[[Integer, Integer], String]
+  end
+end

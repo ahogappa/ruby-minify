@@ -1,0 +1,12 @@
+module RubyMinify
+  module Pipeline
+    class ControlFlowSimplify
+      include SourcePatcher
+
+      COLLECTION_CONTEXT_BYTES: Array[Integer]
+      OPERATOR_START_BYTES: Array[Integer]
+
+      def call: (String input, **untyped) -> String
+    end
+  end
+end

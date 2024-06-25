@@ -1,0 +1,7 @@
+module RubyMinify
+  module Pipeline
+    class ParenOptimizer
+      def call: (String input_string, ?analysis: AnalysisResult?) -> String
+    end
+  end
+end

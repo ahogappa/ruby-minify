@@ -1,0 +1,9 @@
+module RubyMinify
+  module Pipeline
+    class BooleanShorten
+      include SourcePatcher
+
+      def call: (String input, **untyped) -> String
+    end
+  end
+end

@@ -1,0 +1,99 @@
+# frozen_string_literal: true
+
+require 'simplecov'
+SimpleCov.start do
+  add_filter '/tests/'
+  add_filter '/vendor/'
+  track_files 'lib/**/*.rb'
+end
+
+require 'minitest/autorun'
+require 'open3'
+require 'tempfile'
+require 'rbconfig'
+require_relative '../lib/ruby_minify'
+
+module MinifyTestHelper
+  def minify_code(code, _options = {}, rbs_files: {})
+    minify_at_level(code, RubyMinify::Minifier::DEFAULT_LEVEL, rbs_files: rbs_files)
+  end
+
+  def minify_at_level(code, level, verify_output: true, rbs_files: {})
+    source = RubyMinify::Pipeline::ConcatenatedSource.new(
+      content: code,
+      file_boundaries: [],
+      original_size: code.bytesize,
+      stdlib_requires: [],
+      rbs_files: rbs_files
+    )
+    source = RubyMinify::Pipeline::Preprocessor.new.call(source)
+
+    compacted = RubyMinify::Pipeline::Compactor.new.call(source.content)
+    stages = RubyMinify::Minifier::STAGES[level] || RubyMinify::Minifier::STAGES[RubyMinify::Minifier::DEFAULT_LEVEL]
+    result = RubyMinify::Minifier.run_stages(compacted, stages, rbs_files: rbs_files)
+
+    assert_output_preserved(code, result) if verify_output
+    result
+  end
+
+  def assert_output_preserved(original, rename_result)
+    parts = [rename_result.preamble, rename_result.code, rename_result.aliases].reject(&:empty?)
+    runnable = parts.join(';')
+    orig_out, orig_success = run_ruby_code(original)
+    min_out, min_success = run_ruby_code(runnable)
+    assert_equal orig_success, min_success,
+      "Exit status mismatch (original=#{orig_success}, minified=#{min_success})\nMinified code:\n#{runnable}"
+    assert_equal orig_out, min_out,
+      "Output mismatch.\nMinified code:\n#{runnable}"
+  end
+
+  private
+
+  def run_ruby_code(code)
+    Tempfile.create(['minify_test', '.rb']) do |f|
+      f.write(code)
+      f.flush
+      stdout, _stderr, status = Open3.capture3(RbConfig.ruby, f.path)
+      [stdout, status.success?]
+    end
+  end
+end
+
+# Fake node for unit testing rename mapping classes.
+# Simulates code_range for RubyMinify.location_key.
+module FakeNodeSupport
+  FakePosition = Struct.new(:lineno, :column)
+
+  FakeCodeRange = Struct.new(:id) do
+    def first = FakeNodeSupport::FakePosition.new(id, 0)
+    def last = FakeNodeSupport::FakePosition.new(id, 0)
+  end
+
+  FAKE_CREF_CACHE = {}
+
+  FakeCref = Struct.new(keyword_init: true) do
+    def outer = nil
+  end
+
+  FakeLenv = Struct.new(:cref_id) do
+    def cref
+      FakeNodeSupport::FAKE_CREF_CACHE[cref_id] ||= FakeNodeSupport::FakeCref.new
+    end
+  end
+
+  FakeNode = Struct.new(:id, :cref_id, keyword_init: true) do
+    def initialize(id, cref_id: nil)
+      super(id: id, cref_id: cref_id)
+    end
+
+    def code_range = FakeNodeSupport::FakeCodeRange.new(id)
+
+    def lenv
+      return nil unless cref_id
+      FakeNodeSupport::FakeLenv.new(cref_id)
+    end
+  end
+
+  def fake_node(id, **kw) = FakeNode.new(id, **kw)
+  def loc_key(id) = [id << 20, id << 20]
+end

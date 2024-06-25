@@ -1,0 +1,22 @@
+module TypeProf
+  module Core
+    class Type
+      def base_type: (GlobalEnv genv) -> Type
+
+      class Singleton < Type
+        attr_reader mod: ModuleEntity
+      end
+
+      class Instance < Type
+        attr_reader mod: ModuleEntity
+      end
+
+      class Symbol < Type
+        attr_reader sym: ::Symbol
+      end
+
+      class Bot < Type
+      end
+    end
+  end
+end

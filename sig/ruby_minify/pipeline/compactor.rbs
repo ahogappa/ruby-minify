@@ -1,0 +1,14 @@
+module RubyMinify
+  module Pipeline
+    class Compactor
+      BINARY_OPERATORS: Array[Symbol]
+      NON_ASSOCIATIVE_OPS: Set[Symbol]
+      OPERATOR_PRECEDENCE: Hash[Symbol, Integer]
+      COMPOUND_WRITE_NODES: Array[singleton(Prism::Node)]
+      MODIFIER_KEYWORD_NODES: Array[singleton(Prism::Node)]
+      ASSIGNMENT_NODES: Array[singleton(Prism::Node)]
+
+      def call: (String input_string, **untyped) -> String
+    end
+  end
+end

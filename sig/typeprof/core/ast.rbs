@@ -1,0 +1,263 @@
+module TypeProf
+  module Core
+    class AST
+      class Node
+        attr_reader lenv: LocalEnv
+        attr_reader static_ret: Node?
+        attr_reader ret: BasicVertex
+        attr_reader raw_node: Prism::Node
+
+        def traverse: () { (Node) -> void } -> void
+        def each_subnode: () { (Node) -> void } -> void
+        def boxes: (Symbol kind) -> Array[untyped]
+      end
+
+      class CallBaseNode < Node
+        attr_reader recv: Node?
+        attr_reader mid: Symbol
+        attr_reader positional_args: Array[Node]?
+        attr_reader block_body: Node?
+        attr_reader block_f_args: Array[Symbol]?
+        attr_reader block_pass: Node?
+        attr_reader safe_navigation: bool
+
+        def keyword_args: () -> Array[Node]?
+      end
+
+      class CallNode < CallBaseNode
+      end
+
+      class SuperNode < CallBaseNode
+      end
+
+      class ForwardingSuperNode < CallBaseNode
+      end
+
+      class YieldNode < CallBaseNode
+      end
+
+      class OperatorNode < CallBaseNode
+      end
+
+      class IndexReadNode < CallBaseNode
+      end
+
+      class IndexWriteNode < CallBaseNode
+        attr_reader rhs: Node?
+      end
+
+      class CallReadNode < CallBaseNode
+      end
+
+      class CallWriteNode < CallBaseNode
+        attr_reader rhs: Node?
+      end
+
+      class DefNode < Node
+        attr_reader singleton: bool
+        attr_reader mid: Symbol
+        attr_reader body: Node?
+        attr_reader req_positionals: Array[Symbol]
+        attr_reader opt_positionals: Array[Array[untyped]]
+        attr_reader rest_positionals: Symbol?
+        attr_reader post_positionals: Array[Symbol]
+        attr_reader req_keywords: Array[Array[untyped]]
+        attr_reader opt_keywords: Array[Array[untyped]]
+        attr_reader rest_keywords: Symbol?
+        attr_reader block_param: Symbol?
+      end
+
+      class LiteralNode < Node
+        attr_reader lit: untyped
+      end
+
+      class NilNode < LiteralNode
+      end
+
+      class TrueNode < LiteralNode
+      end
+
+      class FalseNode < LiteralNode
+      end
+
+      class IntegerNode < LiteralNode
+      end
+
+      class FloatNode < LiteralNode
+      end
+
+      class SymbolNode < LiteralNode
+      end
+
+      class StringNode < LiteralNode
+      end
+
+      class LocalVariableReadNode < Node
+        attr_reader var: Symbol
+      end
+
+      class LocalVariableWriteNode < Node
+        attr_reader var: Symbol
+        attr_reader rhs: Node?
+      end
+
+      class InstanceVariableReadNode < Node
+        attr_reader var: Symbol
+      end
+
+      class InstanceVariableWriteNode < Node
+        attr_reader var: Symbol
+        attr_reader rhs: Node?
+      end
+
+      class ConstantReadNode < Node
+        attr_reader cname: Symbol
+        attr_reader cbase: Node?
+        attr_reader toplevel: bool
+        attr_reader static_ret: Node?
+      end
+
+      class ConstantWriteNode < Node
+        attr_reader cpath: Array[Symbol]?
+        attr_reader rhs: Node?
+        attr_reader static_cpath: Array[Symbol]?
+      end
+
+      class IfNode < Node
+        attr_reader cond: Node?
+        attr_reader then_body: Node?
+        attr_reader else_body: Node?
+      end
+
+      class UnlessNode < Node
+        attr_reader cond: Node?
+        attr_reader then_body: Node?
+        attr_reader else_body: Node?
+      end
+
+      class WhileNode < Node
+        attr_reader cond: Node?
+        attr_reader body: Node?
+      end
+
+      class UntilNode < Node
+        attr_reader cond: Node?
+        attr_reader body: Node?
+      end
+
+      class CaseNode < Node
+        attr_reader cond: Node?
+        attr_reader whens: Array[Node]?
+        attr_reader else_body: Node?
+      end
+
+      class AndNode < Node
+        attr_reader e1: Node?
+        attr_reader e2: Node?
+      end
+
+      class OrNode < Node
+        attr_reader e1: Node?
+        attr_reader e2: Node?
+      end
+
+      class ReturnNode < Node
+        attr_reader args: Array[Node]?
+      end
+
+      class BreakNode < Node
+        attr_reader args: Array[Node]?
+      end
+
+      class NextNode < Node
+        attr_reader args: Array[Node]?
+      end
+
+      class BeginNode < Node
+        attr_reader body: Node?
+        attr_reader rescue_clauses: Array[Node]?
+        attr_reader else_body: Node?
+        attr_reader ensure_body: Node?
+      end
+
+      class RescueModifierNode < Node
+        attr_reader body: Node?
+        attr_reader rescue_body: Node?
+      end
+
+      class ModuleNode < Node
+        attr_reader body: Node?
+        attr_reader static_cpath: Array[Symbol]?
+      end
+
+      class ClassNode < Node
+        attr_reader body: Node?
+        attr_reader superclass_cpath: Node?
+        attr_reader static_cpath: Array[Symbol]?
+      end
+
+      class IncludeMetaNode < Node
+        attr_reader args: Array[Node]?
+      end
+
+      class AttrReaderMetaNode < Node
+        attr_reader args: Array[Node]?
+      end
+
+      class AttrAccessorMetaNode < Node
+        attr_reader args: Array[Node]?
+      end
+
+      class StatementsNode < Node
+        attr_reader stmts: Array[Node]
+      end
+
+      class DummyNilNode < Node
+      end
+
+      class SplatNode < Node
+        attr_reader child: Node?
+      end
+
+      class SelfNode < Node
+      end
+
+      class ArrayNode < Node
+        attr_reader elems: Array[Node]?
+      end
+
+      class HashNode < Node
+        attr_reader keys: Array[Node]?
+        attr_reader vals: Array[Node]?
+      end
+
+      class RangeNode < Node
+        attr_reader begin_node: Node?
+        attr_reader end_node: Node?
+        attr_reader exclude_end: bool
+      end
+
+      class InterpolatedStringNode < Node
+        attr_reader parts: Array[Node]?
+      end
+
+      class InterpolatedSymbolNode < Node
+        attr_reader parts: Array[Node]?
+      end
+
+      class RegexpNode < Node
+        attr_reader parts: Array[Node]?
+        attr_reader flags: String?
+      end
+
+      class AliasNode < Node
+        attr_reader new_mid: Symbol
+        attr_reader old_mid: Symbol
+      end
+
+      class UndefNode < Node
+        attr_reader names: Array[Symbol]
+      end
+    end
+  end
+end

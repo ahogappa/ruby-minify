@@ -1,0 +1,7 @@
+module RubyMinify
+  module Pipeline
+    class Stage
+      def call: (untyped input) -> untyped
+    end
+  end
+end

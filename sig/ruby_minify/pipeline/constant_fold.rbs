@@ -1,0 +1,12 @@
+module RubyMinify
+  module Pipeline
+    class ConstantFold
+      include SourcePatcher
+
+      FOLDABLE_OPS: Array[Symbol]
+      INTEGER_ONLY_OPS: Array[Symbol]
+
+      def call: (String input, **untyped) -> String
+    end
+  end
+end

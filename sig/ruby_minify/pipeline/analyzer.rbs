@@ -1,0 +1,12 @@
+module RubyMinify
+  module Pipeline
+    class Analyzer < Stage
+      include RubyMinify
+
+      def call: (ConcatenatedSource source) -> AnalysisResult
+      def syntax_data_for: (Prism::ProgramNode prism_ast) -> Hash[Array[Integer], Hash[Symbol, untyped]]
+      def self.prism_only: (ConcatenatedSource source) -> AnalysisResult
+      def self.prism_only_from_string: (String content, ?source: ConcatenatedSource?) -> AnalysisResult
+    end
+  end
+end

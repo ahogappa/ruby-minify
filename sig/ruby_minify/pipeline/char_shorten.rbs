@@ -1,0 +1,9 @@
+module RubyMinify
+  module Pipeline
+    class CharShorten
+      include SourcePatcher
+
+      def call: (String input, **untyped) -> String
+    end
+  end
+end

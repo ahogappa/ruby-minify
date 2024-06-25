@@ -1,0 +1,24 @@
+module RubyMinify
+  class ExternalPrefixInfo
+    attr_accessor prefix_path: Array[Symbol]
+    attr_accessor prefix_string: String?
+    attr_accessor short_name: String?
+    attr_accessor usage_count: Integer
+    attr_accessor char_savings: Integer
+
+    def initialize: (?prefix_path: Array[Symbol]?, ?prefix_string: String?, ?short_name: String?, ?usage_count: Integer?, ?char_savings: Integer?) -> void
+  end
+
+  class ExternalPrefixAliaser
+    MIN_SAVINGS_THRESHOLD: Integer
+
+    attr_reader mappings: Hash[Array[Symbol], ExternalPrefixInfo]
+
+    def initialize: (Set[Array[Symbol]] user_defined_paths) -> void
+    def finalized?: () -> bool
+    def collect_reference: (Array[Symbol] full_path) -> void
+    def assign_short_names: (NameGenerator name_generator) -> void
+    def short_name_for_prefix: (Array[Symbol]? full_path) -> String?
+    def generate_prefix_declarations: () -> Array[String]
+  end
+end
