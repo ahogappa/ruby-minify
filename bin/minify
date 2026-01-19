@@ -1,6 +1,81 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require 'optparse'
 require_relative '../lib/ruby/minify'
 
-BaseMinify.new.read_path(ARGV[0]).minify.output
+options = {
+  mangle: true,
+  transform: true,
+  output: nil
+}
+
+parser = OptionParser.new do |opts|
+  opts.banner = "Usage: minify [options] INPUT_FILE"
+
+  opts.on("-o", "--output FILE", "Write output to FILE instead of stdout") do |file|
+    options[:output] = file
+  end
+
+  opts.on("--no-mangle", "Disable variable/method name mangling") do
+    options[:mangle] = false
+  end
+
+  opts.on("--no-transform", "Disable AST transformations") do
+    options[:transform] = false
+  end
+
+  opts.on("-h", "--help", "Display this help message") do
+    puts opts
+    exit 0
+  end
+
+  opts.on("-v", "--version", "Display version") do
+    puts "ruby-minify version #{Ruby::Minify::VERSION}"
+    exit 0
+  end
+end
+
+begin
+  parser.parse!
+rescue OptionParser::InvalidOption => e
+  warn "Error: #{e.message}"
+  warn parser
+  exit 1
+end
+
+if ARGV.empty?
+  warn "Error: No input file specified"
+  warn parser
+  exit 1
+end
+
+input_file = ARGV[0]
+
+unless File.exist?(input_file)
+  warn "Error: File not found: #{input_file}"
+  exit 1
+end
+
+begin
+  minifier = BaseMinify.new
+  minifier.read_path(input_file).minify(options)
+
+  if options[:output]
+    File.write(options[:output], minifier.result)
+  else
+    puts minifier.result
+  end
+rescue Ruby::Minify::SyntaxError => e
+  warn "Error: Syntax error in #{input_file}"
+  warn "  #{e.message}"
+  exit 2
+rescue Ruby::Minify::MinifyError => e
+  warn "Error: Minification error in #{input_file}"
+  warn "  #{e.message}"
+  exit 2
+rescue => e
+  warn "Error: Internal error during minification"
+  warn "  #{e.message}"
+  exit 3
+end

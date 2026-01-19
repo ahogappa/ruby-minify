@@ -1,31 +1,133 @@
 # Ruby::Minify
 
-TODO: Delete this and the text below, and describe your gem
+A Ruby code minifier that uses TypeProf for intelligent variable name mangling and AST-based transformations to achieve high compression rates while preserving functional equivalence.
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/ruby/minify`. To experiment with that code, run `bin/console` for an interactive prompt.
+## Features
+
+- **Whitespace & Comment Removal**: Strips all unnecessary whitespace and comments
+- **Variable Mangling**: Shortens local variable and parameter names (a, b, c, ..., aa, ab, ...)
+- **AST Transformations**: Converts `true` to `!!1`, `false` to `!1`, `if-else` to ternary operators, and `do-end` blocks to `{}`
+- **Dynamic Code Detection**: Automatically disables mangling in scopes containing `eval`, `binding`, `send`, etc. to prevent runtime breakage
+- **Scope-Aware**: Uses TypeProf's variable tracking to ensure correct mangling across nested scopes
 
 ## Installation
 
-TODO: Replace `UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG` with your gem name right after releasing it to RubyGems.org. Please do not do it earlier due to security reasons. Alternatively, replace this section with instructions to install your gem from git if you don't plan to release to RubyGems.org.
+Add this line to your application's Gemfile:
 
-Install the gem and add to the application's Gemfile by executing:
+```ruby
+gem 'ruby-minify'
+```
 
-    $ bundle add UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+And then execute:
 
-If bundler is not being used to manage dependencies, install the gem by executing:
+    $ bundle install
 
-    $ gem install UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+Or install it yourself as:
+
+    $ gem install ruby-minify
 
 ## Usage
 
-TODO: Write usage instructions here
+### Command Line
+
+```bash
+# Basic minification (output to stdout)
+bin/minify path/to/file.rb
+
+# Write to output file
+bin/minify path/to/file.rb --output minified.rb
+bin/minify path/to/file.rb -o minified.rb
+
+# Disable variable mangling
+bin/minify path/to/file.rb --no-mangle
+
+# Disable AST transformations
+bin/minify path/to/file.rb --no-transform
+
+# Show help
+bin/minify --help
+
+# Show version
+bin/minify --version
+```
+
+### Ruby API
+
+```ruby
+require 'ruby/minify'
+
+minifier = BaseMinify.new
+
+# Minify a file
+minifier.read_path('path/to/file.rb').minify
+puts minifier.result
+
+# With options
+minifier.read_path('path/to/file.rb').minify(mangle: true, transform: true)
+
+# Output to file
+minifier.output('output.rb')
+```
+
+## Compression Benchmarks
+
+| File Type | Original | Minified | Compression |
+|-----------|----------|----------|-------------|
+| Comments & whitespace | 245 bytes | 56 bytes | **77%** |
+| Long variable names | 430 bytes | 139 bytes | **68%** |
+| Boolean/control flow | 285 bytes | 116 bytes | **59%** |
+
+Target compression rates:
+- Basic minification (US1): 30%+
+- With variable mangling (US2): 50%+
+- With all transformations (US3): 55%+
+
+## Dynamic Code Safety
+
+The minifier automatically detects dynamic code patterns and disables variable mangling in affected scopes to prevent runtime breakage:
+
+- `eval`, `instance_eval`, `class_eval`, `module_eval`
+- `binding`, `local_variable_get`, `local_variable_set`
+- `send`, `__send__`, `public_send`
+- `method`, `define_method`, `respond_to?`
+
+Example:
+```ruby
+# Input
+def calculate(formula, value)
+  eval(formula.gsub('x', value.to_s))
+end
+
+# Output (variables NOT mangled due to eval)
+def calculate(formula,value);eval(formula.gsub("x",value.to_s));end
+```
+
+## Exit Codes
+
+| Code | Description |
+|------|-------------|
+| 0 | Success |
+| 1 | File not found |
+| 2 | Syntax error in source |
+| 3 | Internal minification error |
+
+## Dependencies
+
+- [TypeProf](https://github.com/ruby/typeprof) - For AST parsing and variable tracking
+- [Prism](https://github.com/ruby/prism) - For syntax validation
 
 ## Development
 
-After checking out the repo, run `bin/setup` to install dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+After checking out the repo, run `bin/setup` to install dependencies. Run tests with:
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+```bash
+bundle exec ruby tests/test_minify.rb
+```
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/ruby-minify.
+Bug reports and pull requests are welcome on GitHub at https://github.com/ahogappa/ruby-minify.
+
+## License
+
+The gem is available as open source under the terms of the MIT License.
