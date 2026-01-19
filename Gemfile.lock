@@ -1,13 +1,15 @@
+GIT
+  remote: https://github.com/ruby/typeprof.git
+  revision: 753de9b8501f4f7c509e605ea9c9982efa8fc311
+  specs:
+    typeprof (0.31.1)
+      prism (>= 1.4.0)
+      rbs (>= 3.6.0)
+
 PATH
   remote: .
   specs:
-    ruby-minify (0.1.0)
-
-PATH
-  remote: /Users/ahogappa/project/typeprof
-  specs:
-    typeprof (0.30.0)
-      rbs (>= 1.8.1)
+    ruby-minify (0.2.0)
 
 GEM
   remote: https://rubygems.org/
@@ -19,12 +21,14 @@ GEM
     irb (1.13.2)
       rdoc (>= 4.0.0)
       reline (>= 0.4.2)
-    logger (1.6.0)
-    prism (0.30.0)
+    logger (1.7.0)
+    minitest (6.0.1)
+      prism (~> 1.5)
+    prism (1.8.0)
     psych (5.1.2)
       stringio
     rake (13.2.1)
-    rbs (3.5.1)
+    rbs (3.10.2)
       logger
     rdoc (6.7.0)
       psych (>= 4.0.0)
@@ -38,6 +42,7 @@ PLATFORMS
 
 DEPENDENCIES
   debug
+  minitest
   prism
   rake (~> 13.0)
   ruby-minify!

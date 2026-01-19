@@ -7,3 +7,8 @@
 /spec/reports/
 /tmp/
 *.min.rb
+
+specs
+.specify
+.claude
+.DS_Store

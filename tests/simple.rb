@@ -27,4 +27,4 @@ else
 end
 
 
-#p("hello");def method(hoge,fuga)hoge+fuga;end;"not use string";42;method(1,2)>3 ? p("3") : p(method(2,3)+method(2,3))
+p :"a-a"
