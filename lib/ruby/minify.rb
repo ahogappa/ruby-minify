@@ -6,6 +6,7 @@ require_relative "minify/version"
 require_relative "minify/name_generator"
 require_relative "minify/detector"
 require_relative "minify/method_aliases"
+require_relative "minify/constant_aliaser"
 
 module Ruby
   module Minify
@@ -18,7 +19,6 @@ module Ruby
     def read_path(path)
       @path = path
       @file = File.read(path)
-      @cache = SpecifyCache.new
 
       self
     end
@@ -46,8 +46,25 @@ module Ruby
         build_scope_mappings(nodes)
       end
 
+      # Build constant alias mappings if transform is enabled
+      if constant_aliasing_enabled?
+        @constant_mapping = ConstantAliasMapping.new
+        collect_constants(nodes)
+        count_constant_references(nodes)
+        generator = ConstantNameGenerator.new
+        @constant_mapping.freeze_mapping(generator)
+      end
+
       # Rebuild with mangled names
-      @result = rebuild(nodes).join(";")
+      rebuilt = rebuild(nodes)
+
+      # Append constant aliases if enabled
+      if constant_aliasing_enabled? && !@constant_mapping.mappings.empty?
+        aliases = @constant_mapping.generate_aliases
+        rebuilt.concat(aliases) unless aliases.empty?
+      end
+
+      @result = rebuilt.join(";")
 
       self
     end
@@ -264,6 +281,8 @@ module Ruby
       when TypeProf::Core::AST::CallNode
         # Get potentially shortened method name
         method_name = transform_method_name(subnode)
+        # Use &. for safe navigation, . for regular method calls
+        call_op = subnode.safe_navigation ? '&.' : '.'
         if middle_method?(subnode.mid)
           "#{rebuild_node(subnode.recv)}#{subnode.mid}#{rebuild_node(subnode.positional_args.first)}"
         elsif with_block_method?(subnode)
@@ -280,18 +299,29 @@ module Ruby
               "|#{mangled_block_params.join(',')}|"
             end
             block_body = rebuild_statement(subnode.block_body)
-            "#{subnode.recv.nil? ? '' : "#{rebuild_node(subnode.recv)}."}#{method_name}#{subnode.positional_args.empty? ? '' : "(#{subnode.positional_args.map{rebuild_node(_1)}.join(',')})"}{#{block_params_str}#{block_body}}"
+            "#{subnode.recv.nil? ? '' : "#{rebuild_node(subnode.recv)}#{call_op}"}#{method_name}#{subnode.positional_args.empty? ? '' : "(#{subnode.positional_args.map{rebuild_node(_1)}.join(',')})"}{#{block_params_str}#{block_body}}"
           elsif !subnode.block_pass.nil?
-            "#{subnode.recv.nil? ? '' : "#{rebuild_node(subnode.recv)}."}#{method_name}#{subnode.positional_args.empty? ? '' : "(#{subnode.positional_args.map{rebuild_node(_1)}.join(',')})"}(&#{rebuild_node(subnode.block_pass)})"
+            "#{subnode.recv.nil? ? '' : "#{rebuild_node(subnode.recv)}#{call_op}"}#{method_name}#{subnode.positional_args.empty? ? '' : "(#{subnode.positional_args.map{rebuild_node(_1)}.join(',')})"}(&#{rebuild_node(subnode.block_pass)})"
           end
         elsif subnode.mid == '[]'.to_sym
           "#{rebuild_node(subnode.recv)}[#{subnode.positional_args.map{rebuild_node(_1)}.join(',')}]"
         elsif subnode.mid == '[]='.to_sym
           "#{rebuild_node(subnode.recv)}[#{rebuild_node(subnode.positional_args.first)}]=#{subnode.positional_args[1..].map{rebuild_node(_1)}.join}"
         elsif subnode.mid == '!'.to_sym
-          "!#{rebuild_node(subnode.recv)}"
+          recv_str = rebuild_node(subnode.recv)
+          # Add parentheses for compound expressions to preserve precedence
+          # Check both direct AndNode/OrNode and StatementsNode wrapping them
+          inner_node = subnode.recv
+          if inner_node.is_a?(TypeProf::Core::AST::StatementsNode) && inner_node.stmts.size == 1
+            inner_node = inner_node.stmts.first
+          end
+          if inner_node.is_a?(TypeProf::Core::AST::AndNode) || inner_node.is_a?(TypeProf::Core::AST::OrNode)
+            "!(#{recv_str})"
+          else
+            "!#{recv_str}"
+          end
         else
-          "#{subnode.recv.nil? ? '' : "#{rebuild_node(subnode.recv)}."}#{method_name}#{subnode.positional_args.empty? ? '' : "(#{subnode.positional_args.map{rebuild_node(_1)}.join(',')})"}"
+          "#{subnode.recv.nil? ? '' : "#{rebuild_node(subnode.recv)}#{call_op}"}#{method_name}#{subnode.positional_args.empty? ? '' : "(#{subnode.positional_args.map{rebuild_node(_1)}.join(',')})"}"
         end
       when TypeProf::Core::AST::DefNode
         # Get mangled params using TypeProf's lenv.cref
@@ -395,11 +425,24 @@ module Ruby
       when TypeProf::Core::AST::ClassNode
         body = rebuild_statement(subnode.body)
         body_str = body.nil? || body.empty? ? "" : ";#{body}"
-        "class #{subnode.cpath.cname}#{subnode.superclass_cpath ? "<#{subnode.superclass_cpath.cname}" : ''}#{body_str};end"
+        # Use static_cpath for accurate short name lookup
+        class_name = get_constant_short_name(subnode.static_cpath)
+        # Superclass can use short name if it's a user-defined constant, otherwise keep original
+        superclass_str = if subnode.superclass_cpath
+          # Build full path from superclass ConstantReadNode for accurate lookup
+          superclass_path = build_constant_path(subnode.superclass_cpath)
+          superclass_name = get_constant_short_name(superclass_path || subnode.superclass_cpath.cname)
+          "<#{superclass_name}"
+        else
+          ''
+        end
+        "class #{class_name}#{superclass_str}#{body_str};end"
       when TypeProf::Core::AST::ModuleNode
         body = rebuild_statement(subnode.body)
         body_str = body.nil? || body.empty? ? "" : ";#{body}"
-        "module #{subnode.cpath.cname}#{body_str};end"
+        # Use static_cpath for accurate short name lookup
+        module_name = get_constant_short_name(subnode.static_cpath)
+        "module #{module_name}#{body_str};end"
       when TypeProf::Core::AST::SelfNode
         'self'
       when TypeProf::Core::AST::AndNode
@@ -438,9 +481,26 @@ module Ruby
           "#{subnode.var}=#{rebuild_node(subnode.rhs)}"
         end
       when TypeProf::Core::AST::ConstantReadNode
-        "#{subnode.cbase.nil? ? '' : "#{rebuild_node(subnode.cbase)}::"}#{subnode.cname.to_s}"
+        # Build full path and get short name using path-based lookup
+        full_path = build_constant_path(subnode)
+        const_name = if full_path && @constant_mapping&.user_defined_path?(full_path)
+          # User-defined constant with full path - use short name
+          get_constant_short_name(full_path)
+        elsif full_path
+          # Qualified path exists but not user-defined - preserve original name
+          subnode.cname.to_s
+        else
+          # No full path available - fall back to name-based lookup
+          get_constant_short_name(subnode.cname)
+        end
+        "#{subnode.cbase.nil? ? '' : "#{rebuild_node(subnode.cbase)}::"}#{const_name}"
       when TypeProf::Core::AST::ConstantWriteNode
-        "#{subnode.static_cpath.join('::')}=#{rebuild_node(subnode.rhs)}"
+        # Use TypeProf's static_cpath for accurate short name lookup
+        static_cpath = subnode.static_cpath
+        # Build prefix paths for each scope component to ensure unique resolution
+        # e.g., [:Foo, :Bar, :QUX] -> resolve [:Foo], [:Foo, :Bar], [:Foo, :Bar, :QUX]
+        path = static_cpath.each_index.map { |i| get_constant_short_name(static_cpath[0..i]) }
+        "#{path.join('::')}=#{rebuild_node(subnode.rhs)}"
       when TypeProf::Core::AST::StringNode
         # lit contains the source escape sequences, just wrap in quotes
         "\"#{subnode.lit}\""
@@ -505,6 +565,29 @@ module Ruby
         '()'
       when TypeProf::Core::AST::StatementsNode
         rebuild_statement(subnode)
+      when TypeProf::Core::AST::ForwardingSuperNode
+        'super'
+      when TypeProf::Core::AST::CallWriteNode
+        # Handle call write like: self.foo ||= value
+        recv_str = subnode.recv ? "#{rebuild_node(subnode.recv)}." : ''
+        "#{recv_str}#{subnode.mid}=#{rebuild_node(subnode.rhs)}"
+      when TypeProf::Core::AST::CallReadNode
+        # Handle call read like: self.foo (attribute access)
+        recv_str = subnode.recv ? "#{rebuild_node(subnode.recv)}." : ''
+        "#{recv_str}#{subnode.mid}"
+      when TypeProf::Core::AST::IndexWriteNode
+        # Handle index write like: hash[key] = value
+        "#{rebuild_node(subnode.recv)}[#{subnode.positional_args.map { |a| rebuild_node(a) }.join(',')}]=#{rebuild_node(subnode.rhs)}"
+      when TypeProf::Core::AST::IndexReadNode
+        # Handle index read like: hash[key]
+        "#{rebuild_node(subnode.recv)}[#{subnode.positional_args.map { |a| rebuild_node(a) }.join(',')}]"
+      when TypeProf::Core::AST::BreakNode
+        case subnode.arg
+        when TypeProf::Core::AST::DummyNilNode, nil
+          'break'
+        else
+          "break #{rebuild_node(subnode.arg)}"
+        end
       else
         raise MinifyError, "Unknown node: #{subnode.class}"
       end
@@ -530,18 +613,19 @@ module Ruby
       %i[+ - * / ** % ^ > < <= >= <=> == ===].include?(method)
     end
 
-    def need_quate?(node)
-      %w[+ - / * % ^ & == === \\]
-    end
-
     def self_assginment?(node)
       case node.rhs
       when TypeProf::Core::AST::OperatorNode
-        node.var == node.rhs.recv.var
+        # e.g., x = x + 1 → x += 1
+        node.rhs.recv.respond_to?(:var) && node.var == node.rhs.recv.var
       when TypeProf::Core::AST::OrNode
-        node.rhs.e1.var == node.var
+        # e.g., x = x || value → x ||= value
+        # Only if e1 is a variable read (not a method call)
+        node.rhs.e1.respond_to?(:var) && node.rhs.e1.var == node.var
       when TypeProf::Core::AST::AndNode
-        node.rhs.e1.var == node.var
+        # e.g., x = x && value → x &&= value
+        # Only if e1 is a variable read (not a method call)
+        node.rhs.e1.respond_to?(:var) && node.rhs.e1.var == node.var
       else
         false
       end
@@ -554,6 +638,174 @@ module Ruby
     # Check if transform option is enabled (default: true)
     def transform_enabled?
       @options.fetch(:transform, true)
+    end
+
+    # Check if constant aliasing is enabled (shares transform option)
+    def constant_aliasing_enabled?
+      transform_enabled?
+    end
+
+    # Get short name for a constant, or original name if not aliased
+    # Can accept either simple name (Symbol) or full path (Array<Symbol>)
+    def get_constant_short_name(cname_or_path)
+      # Extract the simple name from path or use directly
+      simple_name = cname_or_path.is_a?(Array) ? cname_or_path.last : cname_or_path
+
+      return simple_name.to_s unless constant_aliasing_enabled? && @constant_mapping
+
+      if cname_or_path.is_a?(Array)
+        # Full path provided - use path-based lookup
+        short_name = @constant_mapping.short_name_for_path(cname_or_path)
+        short_name || simple_name.to_s
+      else
+        # Simple name - use name-based lookup
+        short_name = @constant_mapping.short_name_for(cname_or_path)
+        short_name || simple_name.to_s
+      end
+    end
+
+    # Register existing short constant names to avoid collisions
+    # Short names (1-2 uppercase letters like A, B, AA) should be reserved
+    def register_existing_short_name(cname)
+      name_str = cname.to_s
+      # If the constant name is a potential short name (1-2 uppercase letters),
+      # register it to avoid collisions
+      if name_str.match?(/\A[A-Z]{1,2}\z/)
+        @constant_mapping.register_existing_name(name_str)
+      end
+    end
+
+    # Collect constant definitions from AST
+    def collect_constants(nodes)
+      traverse_for_constants(nodes.body)
+    end
+
+    # Traverse AST to find constant definitions
+    # Uses TypeProf's static_cpath for accurate full path tracking
+    def traverse_for_constants(node, scope_path = [])
+      return unless node
+
+      case node
+      when TypeProf::Core::AST::StatementsNode
+        node.stmts.each { |stmt| traverse_for_constants(stmt, scope_path) }
+      when TypeProf::Core::AST::ClassNode
+        # Use TypeProf's static_cpath for accurate full path
+        static_cpath = node.static_cpath
+        cname = node.cpath.cname
+        @constant_mapping.add_definition_with_path(static_cpath, definition_type: :class)
+        # Register existing short names for collision avoidance
+        register_existing_short_name(cname)
+        traverse_for_constants(node.body, static_cpath)
+      when TypeProf::Core::AST::ModuleNode
+        static_cpath = node.static_cpath
+        cname = node.cpath.cname
+        @constant_mapping.add_definition_with_path(static_cpath, definition_type: :module)
+        register_existing_short_name(cname)
+        traverse_for_constants(node.body, static_cpath)
+      when TypeProf::Core::AST::ConstantWriteNode
+        static_cpath = node.static_cpath
+        cname = static_cpath.last
+        @constant_mapping.add_definition_with_path(static_cpath, definition_type: :value)
+        register_existing_short_name(cname)
+        traverse_for_constants(node.rhs, scope_path)
+      when TypeProf::Core::AST::DefNode
+        traverse_for_constants(node.body, scope_path)
+      when TypeProf::Core::AST::CallNode
+        traverse_for_constants(node.recv, scope_path)
+        node.positional_args.each { |arg| traverse_for_constants(arg, scope_path) }
+        traverse_for_constants(node.block_body, scope_path) if node.block_body
+      when TypeProf::Core::AST::IfNode, TypeProf::Core::AST::UnlessNode
+        traverse_for_constants(node.cond, scope_path)
+        traverse_for_constants(node.then, scope_path)
+        traverse_for_constants(node.else, scope_path)
+      when TypeProf::Core::AST::WhileNode
+        traverse_for_constants(node.cond, scope_path)
+        traverse_for_constants(node.body, scope_path)
+      when TypeProf::Core::AST::ArrayNode
+        node.elems.each { |elem| traverse_for_constants(elem, scope_path) }
+      when TypeProf::Core::AST::HashNode
+        node.keys.each { |key| traverse_for_constants(key, scope_path) }
+        node.vals.each { |val| traverse_for_constants(val, scope_path) }
+      end
+    end
+
+    # Count references to constants
+    def count_constant_references(nodes)
+      traverse_for_references(nodes.body)
+    end
+
+    # Traverse AST to count constant references
+    # Uses static_cpath when available for accurate tracking
+    def traverse_for_references(node)
+      return unless node
+
+      case node
+      when TypeProf::Core::AST::StatementsNode
+        node.stmts.each { |stmt| traverse_for_references(stmt) }
+      when TypeProf::Core::AST::ClassNode
+        # Use TypeProf's static_cpath for accurate counting
+        @constant_mapping.increment_usage_by_path(node.static_cpath)
+        traverse_for_references(node.body)
+      when TypeProf::Core::AST::ModuleNode
+        @constant_mapping.increment_usage_by_path(node.static_cpath)
+        traverse_for_references(node.body)
+      when TypeProf::Core::AST::ConstantReadNode
+        # Build path from cbase chain for accurate tracking
+        static_cpath = build_constant_path(node)
+        if static_cpath && @constant_mapping.user_defined_path?(static_cpath)
+          @constant_mapping.increment_usage_by_path(static_cpath)
+        else
+          # Fallback to simple name matching
+          @constant_mapping.increment_usage(node.cname)
+        end
+        traverse_for_references(node.cbase) if node.cbase
+      when TypeProf::Core::AST::ConstantWriteNode
+        @constant_mapping.increment_usage_by_path(node.static_cpath)
+        traverse_for_references(node.rhs)
+      when TypeProf::Core::AST::DefNode
+        traverse_for_references(node.body)
+      when TypeProf::Core::AST::CallNode
+        traverse_for_references(node.recv)
+        node.positional_args.each { |arg| traverse_for_references(arg) }
+        traverse_for_references(node.block_body) if node.block_body
+      when TypeProf::Core::AST::IfNode, TypeProf::Core::AST::UnlessNode
+        traverse_for_references(node.cond)
+        traverse_for_references(node.then)
+        traverse_for_references(node.else)
+      when TypeProf::Core::AST::WhileNode
+        traverse_for_references(node.cond)
+        traverse_for_references(node.body)
+      when TypeProf::Core::AST::ArrayNode
+        node.elems.each { |elem| traverse_for_references(elem) }
+      when TypeProf::Core::AST::HashNode
+        node.keys.each { |key| traverse_for_references(key) }
+        node.vals.each { |val| traverse_for_references(val) }
+      when TypeProf::Core::AST::LocalVariableWriteNode
+        traverse_for_references(node.rhs)
+      when TypeProf::Core::AST::AndNode, TypeProf::Core::AST::OrNode
+        traverse_for_references(node.e1)
+        traverse_for_references(node.e2)
+      when TypeProf::Core::AST::ReturnNode
+        traverse_for_references(node.arg)
+      end
+    end
+
+    # Build full constant path from ConstantReadNode by traversing cbase chain
+    # e.g., MyModule::InnerClass -> [:MyModule, :InnerClass]
+    def build_constant_path(node)
+      return nil unless node.is_a?(TypeProf::Core::AST::ConstantReadNode)
+
+      path = [node.cname]
+      current = node.cbase
+      while current
+        if current.is_a?(TypeProf::Core::AST::ConstantReadNode)
+          path.unshift(current.cname)
+          current = current.cbase
+        else
+          break
+        end
+      end
+      path
     end
 
     # Get receiver type from AST node for method alias replacement
@@ -653,28 +905,4 @@ end
 
 class BaseMinify
   include Ruby::Minify
-end
-
-class SpecifyCache
-  DEFAULT_CACHING_HASH = {
-    :Kernel => {
-      :p => 'p',
-    },
-    :Object => {
-      :dup => 'dup',
-    }
-  }
-
-  def initialize
-    @cache = DEFAULT_CACHING_HASH
-  end
-
-  def set(key, value)
-    @cache ||= {}
-    @cache[key] = value
-  end
-
-  def get(key)
-    @cache[key]
-  end
 end
