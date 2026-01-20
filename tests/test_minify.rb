@@ -729,6 +729,35 @@ class TestMinify < Minitest::Test
     assert_includes minified, '.find{', "detect should be replaced with find"
   end
 
+  # T028b: Hash#select/reject/compact return Hash, not Array
+  # This tests that chained calls on Hash correctly infer Hash return type
+  def test_us4_hash_chained_methods_return_hash
+    # Hash#select returns Hash, so chained has_key? should still work
+    code = '{ a: 1, b: 2 }.select { |k, v| v > 0 }.has_key?(:a)'
+    minified = minify_code(code)
+    # has_key? should be replaced with key? because select on Hash returns Hash
+    assert_includes minified, '.key?(', "has_key? after Hash#select should be replaced with key?"
+
+    # Hash#reject returns Hash
+    code2 = '{ a: 1, b: 2 }.reject { |k, v| v < 0 }.has_value?(1)'
+    minified2 = minify_code(code2)
+    assert_includes minified2, '.value?(', "has_value? after Hash#reject should be replaced with value?"
+
+    # Hash#compact returns Hash
+    code3 = '{ a: 1, b: nil }.compact.each_pair { |k, v| puts v }'
+    minified3 = minify_code(code3)
+    assert_includes minified3, '.each{', "each_pair after Hash#compact should be replaced with each"
+  end
+
+  # T028c: Array#select returns Array (not Hash behavior)
+  def test_us4_array_chained_methods_return_array
+    # Array#select returns Array, so chained collect should work
+    code = '[1, 2, 3].select { |x| x > 1 }.collect { |x| x * 2 }'
+    minified = minify_code(code)
+    assert_includes minified, '.select{', "select on Array should remain select"
+    assert_includes minified, '.map{', "collect after Array#select should be replaced with map"
+  end
+
   # ===========================================
   # User Story 4 (US3): Option Control Tests
   # ===========================================
