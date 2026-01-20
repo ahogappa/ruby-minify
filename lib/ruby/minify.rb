@@ -572,20 +572,22 @@ module Ruby
         receiver_type = get_receiver_type(recv_node.recv)
         method_name = recv_node.mid
 
-        # Enumerable methods that return Array
-        array_returning_methods = [:select, :find_all, :collect, :map, :reject,
-                                   :sort, :sort_by, :take, :drop, :flatten,
-                                   :compact, :uniq, :reverse, :shuffle, :sample,
-                                   :flat_map, :collect_concat, :grep, :zip]
-        if array_returning_methods.include?(method_name) && ENUMERABLE_CLASSES.include?(receiver_type)
-          return :Array
-        end
-
-        # Hash methods that return Hash
+        # Hash methods that return Hash (check first to avoid misclassification)
+        # Hash#select, Hash#reject, Hash#compact return Hash, not Array
         hash_returning_methods = [:select, :reject, :transform_keys, :transform_values,
                                   :merge, :compact, :invert, :slice, :except]
         if hash_returning_methods.include?(method_name) && receiver_type == :Hash
           return :Hash
+        end
+
+        # Enumerable methods that return Array
+        # Note: Hash is excluded here because Hash#select etc. return Hash (handled above)
+        array_returning_methods = [:select, :find_all, :collect, :map, :reject,
+                                   :sort, :sort_by, :take, :drop, :flatten,
+                                   :compact, :uniq, :reverse, :shuffle, :sample,
+                                   :flat_map, :collect_concat, :grep, :zip]
+        if array_returning_methods.include?(method_name) && ENUMERABLE_CLASSES.include?(receiver_type) && receiver_type != :Hash
+          return :Array
         end
 
         # String methods that return String
