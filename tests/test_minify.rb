@@ -484,6 +484,7 @@ class TestMinify < Minitest::Test
     minify_path = File.join(lib_dir, 'minify.rb')
     detector_path = File.join(lib_dir, 'minify/detector.rb')
     name_generator_path = File.join(lib_dir, 'minify/name_generator.rb')
+    method_aliases_path = File.join(lib_dir, 'minify/method_aliases.rb')
 
     # Step 1: Minify the minifier files using original minifier
     minifier = BaseMinify.new
@@ -492,13 +493,15 @@ class TestMinify < Minitest::Test
     minified_minify = minifier.read_path(minify_path).minify(mangle: false).result
     minified_detector = minifier.read_path(detector_path).minify(mangle: false).result
     minified_name_generator = minifier.read_path(name_generator_path).minify(mangle: false).result
+    minified_method_aliases = minifier.read_path(method_aliases_path).minify(mangle: false).result
 
     # Verify minified files are valid Ruby
     require 'prism'
     [
       ['minify.rb', minified_minify],
       ['detector.rb', minified_detector],
-      ['name_generator.rb', minified_name_generator]
+      ['name_generator.rb', minified_name_generator],
+      ['method_aliases.rb', minified_method_aliases]
     ].each do |name, code|
       result = Prism.parse(code)
       assert result.errors.empty?, "Minified #{name} should be valid Ruby: #{result.errors.map(&:message).join(', ')}"
@@ -522,6 +525,7 @@ class TestMinify < Minitest::Test
       File.write(File.join(tmpdir, 'ruby', 'minify.rb'), minified_minify)
       File.write(File.join(minify_dir, 'detector.rb'), minified_detector)
       File.write(File.join(minify_dir, 'name_generator.rb'), minified_name_generator)
+      File.write(File.join(minify_dir, 'method_aliases.rb'), minified_method_aliases)
 
       # Copy version.rb (no need to minify)
       version_path = File.join(lib_dir, 'minify/version.rb')
@@ -550,5 +554,258 @@ class TestMinify < Minitest::Test
       assert_equal original_output.strip, minified_output.strip,
         "Minified minifier should produce same output as original minifier"
     end
+  end
+
+  # ===========================================
+  # User Story 4: Method Alias Shortening Tests
+  # ===========================================
+  # Note: Tests use test_us4_* prefix because existing test file has
+  # us1 (whitespace), us2 (mangling), us3 (transform).
+  # This feature is the 4th test group in the file.
+
+  # T005: collect -> map for Array literals
+  def test_us4_collect_to_map
+    code = '[1,2,3].collect { |x| x * 2 }'
+    minified = minify_code(code)
+    assert_includes minified, '.map{', "collect should be replaced with map"
+    refute_includes minified, '.collect{', "collect should not appear in output"
+  end
+
+  # T006: detect -> find for Array literals
+  def test_us4_detect_to_find
+    code = '[1,2,3].detect { |x| x > 1 }'
+    minified = minify_code(code)
+    assert_includes minified, '.find{', "detect should be replaced with find"
+    refute_includes minified, '.detect{', "detect should not appear in output"
+  end
+
+  # T007: find_all -> select for Array literals
+  def test_us4_find_all_to_select
+    code = '[1,2,3].find_all { |x| x > 1 }'
+    minified = minify_code(code)
+    assert_includes minified, '.select{', "find_all should be replaced with select"
+    refute_includes minified, '.find_all{', "find_all should not appear in output"
+  end
+
+  # T008: has_key? -> key? for Hash literals
+  def test_us4_has_key_to_key
+    code = '{ a: 1 }.has_key?(:a)'
+    minified = minify_code(code)
+    assert_includes minified, '.key?(', "has_key? should be replaced with key?"
+    refute_includes minified, '.has_key?(', "has_key? should not appear in output"
+  end
+
+  # T009: has_value? -> value? for Hash literals
+  def test_us4_has_value_to_value
+    code = '{ a: 1 }.has_value?(1)'
+    minified = minify_code(code)
+    assert_includes minified, '.value?(', "has_value? should be replaced with value?"
+    refute_includes minified, '.has_value?(', "has_value? should not appear in output"
+  end
+
+  # T010: each_pair -> each for Hash literals
+  def test_us4_each_pair_to_each
+    code = '{ a: 1 }.each_pair { |k, v| puts k }'
+    minified = minify_code(code)
+    assert_includes minified, '.each{', "each_pair should be replaced with each"
+    refute_includes minified, '.each_pair{', "each_pair should not appear in output"
+  end
+
+  # T011: magnitude -> abs for Integer literals
+  def test_us4_magnitude_to_abs
+    code = '(-5).magnitude'
+    minified = minify_code(code)
+    assert_includes minified, '.abs', "magnitude should be replaced with abs"
+    refute_includes minified, '.magnitude', "magnitude should not appear in output"
+  end
+
+  # T012: kind_of? -> is_a? (Object method, applies to all)
+  def test_us4_kind_of_to_is_a
+    # Object methods should work on known types
+    code = '[1,2,3].kind_of?(Array)'
+    minified = minify_code(code)
+    assert_includes minified, '.is_a?(', "kind_of? should be replaced with is_a?"
+    refute_includes minified, '.kind_of?(', "kind_of? should not appear in output"
+  end
+
+  # T013: yield_self -> then for known types
+  def test_us4_yield_self_to_then
+    code = '"test".yield_self { |s| s.upcase }'
+    minified = minify_code(code)
+    assert_includes minified, '.then{', "yield_self should be replaced with then"
+    refute_includes minified, '.yield_self{', "yield_self should not appear in output"
+  end
+
+  # T014: length -> size for String literals
+  def test_us4_length_to_size
+    code = '"hello".length'
+    minified = minify_code(code)
+    assert_includes minified, '.size', "length should be replaced with size"
+    refute_includes minified, '.length', "length should not appear in output"
+  end
+
+  # T015: id2name -> to_s for Symbol literals
+  def test_us4_id2name_to_to_s
+    code = ':sym.id2name'
+    minified = minify_code(code)
+    assert_includes minified, '.to_s', "id2name should be replaced with to_s"
+    refute_includes minified, '.id2name', "id2name should not appear in output"
+  end
+
+  # T016: collect_concat -> flat_map for Array literals
+  def test_us4_collect_concat_to_flat_map
+    code = '[[1], [2]].collect_concat { |x| x }'
+    minified = minify_code(code)
+    assert_includes minified, '.flat_map{', "collect_concat should be replaced with flat_map"
+    refute_includes minified, '.collect_concat{', "collect_concat should not appear in output"
+  end
+
+  # T017: find_index -> index for Array literals
+  def test_us4_find_index_to_index
+    code = '[1,2,3].find_index(2)'
+    minified = minify_code(code)
+    assert_includes minified, '.index(', "find_index should be replaced with index"
+    refute_includes minified, '.find_index(', "find_index should not appear in output"
+  end
+
+  # T018: collect! -> map! for Array (only on literal receivers for safety)
+  def test_us4_collect_bang_to_map_bang
+    code = '[1,2,3].collect! { |x| x * 2 }'
+    minified = minify_code(code)
+    assert_includes minified, '.map!{', "collect! should be replaced with map!"
+    refute_includes minified, '.collect!{', "collect! should not appear in output"
+  end
+
+  # T019: Unknown receiver type should preserve original method
+  def test_us4_unknown_receiver_preserved
+    code = 'custom_obj.collect { |x| x }'
+    minified = minify_code(code)
+    assert_includes minified, '.collect{', "collect on unknown receiver should be preserved"
+    refute_includes minified, '.map{', "map should not appear for unknown receiver"
+  end
+
+  # T020: Functional equivalence test
+  def test_us4_functional_equivalence
+    code = <<~RUBY
+      result = [1, 2, 3].collect { |x| x * 2 }
+      puts result.inspect
+    RUBY
+    minified = minify_code(code)
+
+    original_output = run_ruby(code)
+    minified_output = run_ruby(minified)
+
+    assert_equal original_output, minified_output,
+      "Minified code with alias replacement should produce same output"
+  end
+
+  # ===========================================
+  # User Story 4 (US2): Chained Method Tests
+  # ===========================================
+
+  # T025: Chained find_all + collect
+  def test_us4_chained_find_all_collect
+    code = '[1, 2, 3, 4, 5].find_all { |x| x > 2 }.collect { |x| x * 10 }'
+    minified = minify_code(code)
+    assert_includes minified, '.select{', "find_all should be replaced with select"
+    assert_includes minified, '.map{', "collect should be replaced with map"
+    refute_includes minified, '.find_all{', "find_all should not appear in output"
+    refute_includes minified, '.collect{', "collect should not appear after select"
+  end
+
+  # T026: Chained with proc shorthand
+  def test_us4_chained_with_proc_shorthand
+    code = '[1, 2, 3].find_all { |x| x > 1 }.collect { |x| x.to_s }'
+    minified = minify_code(code)
+    assert_includes minified, '.select{', "find_all should be replaced with select"
+    assert_includes minified, '.map{', "collect should be replaced with map"
+  end
+
+  # T027: Deeply chained methods (3+)
+  def test_us4_deeply_chained
+    code = '[1, 2, 3].collect { |x| x * 2 }.detect { |x| x > 4 }'
+    minified = minify_code(code)
+    assert_includes minified, '.map{', "collect should be replaced with map"
+    assert_includes minified, '.find{', "detect should be replaced with find"
+  end
+
+  # ===========================================
+  # User Story 4 (US3): Option Control Tests
+  # ===========================================
+
+  # T030: transform: false preserves original method names
+  def test_us4_no_transform_preserves_aliases
+    code = '[1, 2, 3].collect { |x| x * 2 }'
+    minified = minify_code(code, { transform: false })
+    assert_includes minified, '.collect{', "collect should be preserved with transform: false"
+    refute_includes minified, '.map{', "map should not appear with transform: false"
+  end
+
+  # T031: transform: true (default) replaces aliases
+  def test_us4_transform_true_replaces_aliases
+    code = '[1, 2, 3].collect { |x| x * 2 }'
+    # Default should have transform: true
+    minified = minify_code(code)
+    assert_includes minified, '.map{', "collect should be replaced with map by default"
+    refute_includes minified, '.collect{', "collect should not appear by default"
+  end
+
+  # T033: Compression improvement test
+  def test_us4_compression_improvement
+    # Code with long method names
+    code_with_aliases = <<~RUBY
+      result1 = [1, 2, 3].collect { |x| x * 2 }
+      result2 = [1, 2, 3].find_all { |x| x > 1 }
+      result3 = { a: 1 }.has_key?(:a)
+      result4 = (-5).magnitude
+      result5 = "hello".length
+    RUBY
+
+    # Minify with transform (method alias replacement ON)
+    minified_with_transform = minify_code(code_with_aliases, { transform: true })
+
+    # Minify without transform (method alias replacement OFF)
+    minified_without_transform = minify_code(code_with_aliases, { transform: false })
+
+    # Calculate savings
+    savings = minified_without_transform.bytesize - minified_with_transform.bytesize
+    savings_percent = (savings.to_f / minified_without_transform.bytesize * 100).round(2)
+
+    # Method alias replacement should save at least some bytes
+    # Expected savings: collect->map(4), find_all->select(2), has_key?->key?(4), magnitude->abs(6), length->size(2)
+    # Total: ~18 chars savings
+    assert savings > 0, "Method alias replacement should reduce code size (saved #{savings} bytes, #{savings_percent}%)"
+
+    # Verify the savings are meaningful (at least 5% for this test case)
+    assert savings_percent >= 5, "Method alias replacement should provide >= 5% compression improvement, got #{savings_percent}%"
+  end
+
+  # T024: Test fixture for method aliases
+  def test_us4_method_alias_fixture
+    original_path = File.join(FIXTURES_DIR, 'method_aliases.rb')
+    original = File.read(original_path)
+    minified = minify_fixture('method_aliases.rb')
+
+    # Should have shorter method names
+    assert_includes minified, '.map{', "collect should be replaced with map"
+    assert_includes minified, '.find{', "detect should be replaced with find"
+    assert_includes minified, '.select{', "find_all should be replaced with select"
+    assert_includes minified, '.flat_map{', "collect_concat should be replaced with flat_map"
+    assert_includes minified, '.index(', "find_index should be replaced with index"
+    assert_includes minified, '.map!{', "collect! should be replaced with map!"
+    assert_includes minified, '.key?(', "has_key? should be replaced with key?"
+    assert_includes minified, '.value?(', "has_value? should be replaced with value?"
+    assert_includes minified, '.each{', "each_pair should be replaced with each"
+    assert_includes minified, '.abs', "magnitude should be replaced with abs"
+    assert_includes minified, '.size', "length should be replaced with size"
+    assert_includes minified, '.to_s', "id2name should be replaced with to_s"
+    assert_includes minified, '.is_a?(', "kind_of? should be replaced with is_a?"
+    assert_includes minified, '.then{', "yield_self should be replaced with then"
+
+    # Verify functional equivalence
+    original_output = run_ruby(original)
+    minified_output = run_ruby(minified)
+    assert_equal original_output, minified_output,
+      "Method alias fixture should produce same output after minification"
   end
 end
