@@ -758,6 +758,33 @@ class TestMinify < Minitest::Test
     assert_includes minified, '.map{', "collect after Array#select should be replaced with map"
   end
 
+  # T028d: Methods without explicit return type mapping return :unknown
+  # This prevents incorrect alias replacement on chained calls
+  def test_us4_unknown_return_type_preserves_method
+    # Array#first returns an element (unknown type), not Array
+    # So chained collect should NOT be replaced (receiver type is unknown)
+    code = '[1, 2, 3].first.collect { |x| x }'
+    minified = minify_code(code)
+    assert_includes minified, '.collect{', "collect after first should be preserved (unknown return type)"
+    refute_includes minified, '.map{', "map should not appear after first"
+
+    # Array#last also returns element, not Array
+    code2 = '[[1], [2]].last.collect { |x| x * 2 }'
+    minified2 = minify_code(code2)
+    assert_includes minified2, '.collect{', "collect after last should be preserved"
+
+    # Array#min returns element, not Array
+    code3 = '[[1, 2], [3, 4]].min.collect { |x| x }'
+    minified3 = minify_code(code3)
+    assert_includes minified3, '.collect{', "collect after min should be preserved"
+
+    # Hash#keys returns Array, but it's not in our explicit mapping
+    # So chained collect should be preserved (conservative approach)
+    code4 = '{ a: 1 }.keys.collect { |k| k }'
+    minified4 = minify_code(code4)
+    assert_includes minified4, '.collect{', "collect after keys should be preserved (not in mapping)"
+  end
+
   # ===========================================
   # User Story 4 (US3): Option Control Tests
   # ===========================================
