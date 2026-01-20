@@ -11,21 +11,13 @@ module Ruby
 
       def initialize
         @index = 0
-        @excluded = Set.new
       end
 
-      # Generate next available name, skipping excluded names
+      # Generate next sequential name
       def next_name
-        loop do
-          name = index_to_name(@index)
-          @index = @index + 1
-          return name unless @excluded.include?(name)
-        end
-      end
-
-      # Exclude a name from being generated (to avoid collisions)
-      def exclude(name)
-        @excluded << name.to_s
+        name = index_to_name(@index)
+        @index = @index + 1
+        name
       end
 
       private
@@ -69,13 +61,12 @@ module Ruby
     # Uses static_cpath (full qualified path) as key to distinguish
     # constants with same name in different modules
     class ConstantAliasMapping
-      attr_reader :mappings, :used_short_names, :existing_names
+      attr_reader :mappings, :used_short_names
 
       def initialize
         @mappings = {}           # Hash<Array<Symbol>, ConstantInfo> - key is static_cpath
         @by_name = {}            # Hash<Symbol, Array<ConstantInfo>> - lookup by simple name
         @used_short_names = Set.new
-        @existing_names = Set.new
         @state = :empty
       end
 
@@ -136,29 +127,28 @@ module Ruby
         end
       end
 
-      # Register an existing short name that should be skipped
-      def register_existing_name(name)
-        @existing_names << name
-      end
-
       # Freeze the mapping and assign short names
       def freeze_mapping(name_generator)
         raise "Already frozen" if frozen?
 
         @state = :frozen
 
+        # Collect all existing constant names for collision checking
+        existing_names = Set.new(@mappings.values.map { |info| info.original_name.to_s })
+
         # Sort by usage count (descending) for optimal compression
         sorted_constants = @mappings.values
                                     .select { |info| should_rename?(info) }
                                     .sort_by { |info| -info.usage_count }
 
-        # Exclude existing short names
-        @existing_names.each { |name| name_generator.exclude(name) }
-
-        # Assign short names
+        # Assign short names, skipping any that collide with existing constants
         sorted_constants.each do |info|
-          info.short_name = name_generator.next_name
-          @used_short_names << info.short_name
+          candidate = name_generator.next_name
+          while existing_names.include?(candidate)
+            candidate = name_generator.next_name
+          end
+          info.short_name = candidate
+          @used_short_names << candidate
         end
       end
 

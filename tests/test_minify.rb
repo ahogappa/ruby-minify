@@ -572,6 +572,17 @@ class TestMinify < Minitest::Test
     code = '!foo.bar?'
     minified = minify_code(code, mangle: false, transform: false)
     assert_equal '!foo.bar?', minified
+
+    # Binary operators also need parentheses
+    assert_equal '!(a==b)', minify_code('!(a == b)', mangle: false, transform: false)
+    assert_equal '!(a!=b)', minify_code('!(a != b)', mangle: false, transform: false)
+    assert_equal '!(x<y)', minify_code('!(x < y)', mangle: false, transform: false)
+    assert_equal '!(x>y)', minify_code('!(x > y)', mangle: false, transform: false)
+    assert_equal '!(a+b)', minify_code('!(a + b)', mangle: false, transform: false)
+    assert_equal '!(a-b)', minify_code('!(a - b)', mangle: false, transform: false)
+    assert_equal '!(a&b)', minify_code('!(a & b)', mangle: false, transform: false)
+    assert_equal '!(a|b)', minify_code('!(a | b)', mangle: false, transform: false)
+    assert_equal '!(a=~b)', minify_code('!(a =~ b)', mangle: false, transform: false)
   end
 
   # ===========================================
@@ -903,17 +914,6 @@ class TestMinify < Minitest::Test
     # Test AA, AB sequence
     assert_equal 'AA', generator.next_name
     assert_equal 'AB', generator.next_name
-  end
-
-  # Test ConstantNameGenerator exclude functionality
-  def test_constant_name_generator_exclude
-    generator = Ruby::Minify::ConstantNameGenerator.new
-    generator.exclude('A')
-    generator.exclude('B')
-
-    # Should skip A and B
-    assert_equal 'C', generator.next_name
-    assert_equal 'D', generator.next_name
   end
 
   # Test ConstantAliasMapping basic functionality

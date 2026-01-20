@@ -36,10 +36,6 @@ module Ruby
       nodes = TypeProf::Core::AST.parse_rb(@path, @file)
 
       if mangling_enabled?
-        # Detect dynamic patterns (eval, send, binding, etc.)
-        # that should disable mangling in their scope
-        @detector = Detector.new.scan(nodes)
-
         # Build variable mappings using TypeProf's lenv.cref for scope identification
         # Key: lenv.cref.object_id => { original_var => mangled_name }
         @scope_mappings = {}
@@ -315,7 +311,9 @@ module Ruby
           if inner_node.is_a?(TypeProf::Core::AST::StatementsNode) && inner_node.stmts.size == 1
             inner_node = inner_node.stmts.first
           end
-          if inner_node.is_a?(TypeProf::Core::AST::AndNode) || inner_node.is_a?(TypeProf::Core::AST::OrNode)
+          if inner_node.is_a?(TypeProf::Core::AST::AndNode) ||
+             inner_node.is_a?(TypeProf::Core::AST::OrNode) ||
+             binary_operator_call?(inner_node)
             "!(#{recv_str})"
           else
             "!#{recv_str}"
@@ -610,7 +608,18 @@ module Ruby
     end
 
     def middle_method?(method)
-      %i[+ - * / ** % ^ > < <= >= <=> == ===].include?(method)
+      %i[+ - * / ** % ^ > < <= >= <=> == === != & | << >> =~ !~].include?(method)
+    end
+
+    # Check if node is a CallNode representing a binary operator
+    # These need parentheses when negated: !(a == b) not !a==b
+    BINARY_OPERATORS = %i[== != < > <= >= + - * / % & | ^ << >> === =~ !~ <=>].freeze
+
+    def binary_operator_call?(node)
+      return false unless node.is_a?(TypeProf::Core::AST::CallNode)
+      return false unless node.recv && node.positional_args.size == 1
+
+      BINARY_OPERATORS.include?(node.mid)
     end
 
     def self_assginment?(node)
@@ -664,17 +673,6 @@ module Ruby
       end
     end
 
-    # Register existing short constant names to avoid collisions
-    # Short names (1-2 uppercase letters like A, B, AA) should be reserved
-    def register_existing_short_name(cname)
-      name_str = cname.to_s
-      # If the constant name is a potential short name (1-2 uppercase letters),
-      # register it to avoid collisions
-      if name_str.match?(/\A[A-Z]{1,2}\z/)
-        @constant_mapping.register_existing_name(name_str)
-      end
-    end
-
     # Collect constant definitions from AST
     def collect_constants(nodes)
       traverse_for_constants(nodes.body)
@@ -691,22 +689,15 @@ module Ruby
       when TypeProf::Core::AST::ClassNode
         # Use TypeProf's static_cpath for accurate full path
         static_cpath = node.static_cpath
-        cname = node.cpath.cname
         @constant_mapping.add_definition_with_path(static_cpath, definition_type: :class)
-        # Register existing short names for collision avoidance
-        register_existing_short_name(cname)
         traverse_for_constants(node.body, static_cpath)
       when TypeProf::Core::AST::ModuleNode
         static_cpath = node.static_cpath
-        cname = node.cpath.cname
         @constant_mapping.add_definition_with_path(static_cpath, definition_type: :module)
-        register_existing_short_name(cname)
         traverse_for_constants(node.body, static_cpath)
       when TypeProf::Core::AST::ConstantWriteNode
         static_cpath = node.static_cpath
-        cname = static_cpath.last
         @constant_mapping.add_definition_with_path(static_cpath, definition_type: :value)
-        register_existing_short_name(cname)
         traverse_for_constants(node.rhs, scope_path)
       when TypeProf::Core::AST::DefNode
         traverse_for_constants(node.body, scope_path)
