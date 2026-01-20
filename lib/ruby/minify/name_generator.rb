@@ -28,16 +28,6 @@ module Ruby
         end
       end
 
-      # Reset generator for a new scope
-      def reset
-        @index = 0
-      end
-
-      # Exclude a name from being generated
-      def exclude(name)
-        @excluded << name.to_s
-      end
-
       private
 
       # Convert index to name: 0->a, 25->z, 26->aa, 27->ab, etc.

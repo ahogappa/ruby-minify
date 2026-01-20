@@ -485,15 +485,18 @@ class TestMinify < Minitest::Test
     detector_path = File.join(lib_dir, 'minify/detector.rb')
     name_generator_path = File.join(lib_dir, 'minify/name_generator.rb')
     method_aliases_path = File.join(lib_dir, 'minify/method_aliases.rb')
+    constant_aliaser_path = File.join(lib_dir, 'minify/constant_aliaser.rb')
 
     # Step 1: Minify the minifier files using original minifier
     minifier = BaseMinify.new
 
-    # Minify all source files (mangle: false to keep method names intact for requires)
-    minified_minify = minifier.read_path(minify_path).minify(mangle: false).result
-    minified_detector = minifier.read_path(detector_path).minify(mangle: false).result
-    minified_name_generator = minifier.read_path(name_generator_path).minify(mangle: false).result
-    minified_method_aliases = minifier.read_path(method_aliases_path).minify(mangle: false).result
+    # Minify all source files (mangle: false, transform: false to keep method/constant names intact for requires)
+    # Note: transform: false disables constant aliasing which would break cross-file references
+    minified_minify = minifier.read_path(minify_path).minify(mangle: false, transform: false).result
+    minified_detector = minifier.read_path(detector_path).minify(mangle: false, transform: false).result
+    minified_name_generator = minifier.read_path(name_generator_path).minify(mangle: false, transform: false).result
+    minified_method_aliases = minifier.read_path(method_aliases_path).minify(mangle: false, transform: false).result
+    minified_constant_aliaser = minifier.read_path(constant_aliaser_path).minify(mangle: false, transform: false).result
 
     # Verify minified files are valid Ruby
     require 'prism'
@@ -501,21 +504,14 @@ class TestMinify < Minitest::Test
       ['minify.rb', minified_minify],
       ['detector.rb', minified_detector],
       ['name_generator.rb', minified_name_generator],
-      ['method_aliases.rb', minified_method_aliases]
+      ['method_aliases.rb', minified_method_aliases],
+      ['constant_aliaser.rb', minified_constant_aliaser],
     ].each do |name, code|
       result = Prism.parse(code)
       assert result.errors.empty?, "Minified #{name} should be valid Ruby: #{result.errors.map(&:message).join(', ')}"
     end
 
-    # Step 2: Use minified code to minify a sample
-    sample_code = <<~RUBY
-      def hello(name)
-        greeting = "Hello"
-        "\#{greeting}, \#{name}!"
-      end
-    RUBY
-
-    # Create temp files for minified minifier and sample
+    # Step 2: Use minified minifier to minify minify.rb itself (true self-hosting)
     require 'tempfile'
     Dir.mktmpdir do |tmpdir|
       # Write minified files to temp directory
@@ -526,20 +522,18 @@ class TestMinify < Minitest::Test
       File.write(File.join(minify_dir, 'detector.rb'), minified_detector)
       File.write(File.join(minify_dir, 'name_generator.rb'), minified_name_generator)
       File.write(File.join(minify_dir, 'method_aliases.rb'), minified_method_aliases)
+      File.write(File.join(minify_dir, 'constant_aliaser.rb'), minified_constant_aliaser)
 
       # Copy version.rb (no need to minify)
       version_path = File.join(lib_dir, 'minify/version.rb')
       FileUtils.cp(version_path, minify_dir)
 
-      sample_path = File.join(tmpdir, 'sample.rb')
-      File.write(sample_path, sample_code)
-
-      # Use minified minifier to minify the sample
+      # Use minified minifier to minify minify.rb itself
       runner_code = <<~RUBY
         $LOAD_PATH.unshift('#{tmpdir}')
         require 'ruby/minify'
         minifier = BaseMinify.new
-        result = minifier.read_path('#{sample_path}').minify(mangle: false).result
+        result = minifier.read_path('#{minify_path}').minify(mangle: false, transform: false).result
         puts result
       RUBY
 
@@ -548,12 +542,47 @@ class TestMinify < Minitest::Test
 
       assert status.success?, "Minified minifier should execute successfully: #{stderr}"
 
-      # Step 3: Compare output from original vs minified minifier
-      original_output = minify_code(sample_code, mangle: false)
+      # Step 3: Compare output - minified minifier should produce same result as original
+      original_output = minifier.read_path(minify_path).minify(mangle: false, transform: false).result
 
       assert_equal original_output.strip, minified_output.strip,
-        "Minified minifier should produce same output as original minifier"
+        "Minified minifier should produce same output when minifying minify.rb"
     end
+  end
+
+  # Test for negation operator with compound expressions
+  # !(a && b) should preserve parentheses, not become !a&&b
+  def test_negation_with_compound_expression
+    # !(a && b) - parentheses needed to preserve precedence
+    code = '!(a && b)'
+    minified = minify_code(code, mangle: false, transform: false)
+    assert_equal '!(a&&b)', minified
+
+    # !(a || b) - same for OR
+    code = '!(x || y)'
+    minified = minify_code(code, mangle: false, transform: false)
+    assert_equal '!(x||y)', minified
+
+    # Simple negation - no parentheses needed
+    code = '!a'
+    minified = minify_code(code, mangle: false, transform: false)
+    assert_equal '!a', minified
+
+    # Method call negation - no extra parentheses
+    code = '!foo.bar?'
+    minified = minify_code(code, mangle: false, transform: false)
+    assert_equal '!foo.bar?', minified
+
+    # Binary operators also need parentheses
+    assert_equal '!(a==b)', minify_code('!(a == b)', mangle: false, transform: false)
+    assert_equal '!(a!=b)', minify_code('!(a != b)', mangle: false, transform: false)
+    assert_equal '!(x<y)', minify_code('!(x < y)', mangle: false, transform: false)
+    assert_equal '!(x>y)', minify_code('!(x > y)', mangle: false, transform: false)
+    assert_equal '!(a+b)', minify_code('!(a + b)', mangle: false, transform: false)
+    assert_equal '!(a-b)', minify_code('!(a - b)', mangle: false, transform: false)
+    assert_equal '!(a&b)', minify_code('!(a & b)', mangle: false, transform: false)
+    assert_equal '!(a|b)', minify_code('!(a | b)', mangle: false, transform: false)
+    assert_equal '!(a=~b)', minify_code('!(a =~ b)', mangle: false, transform: false)
   end
 
   # ===========================================
@@ -863,5 +892,517 @@ class TestMinify < Minitest::Test
     minified_output = run_ruby(minified)
     assert_equal original_output, minified_output,
       "Method alias fixture should produce same output after minification"
+  end
+
+  # ===========================================
+  # User Story 5: Constant Aliasing Tests
+  # ===========================================
+  # Phase 2: Foundational Tests
+
+  # T005: Test ConstantNameGenerator basic sequence
+  def test_constant_name_generator_sequence
+    generator = Ruby::Minify::ConstantNameGenerator.new
+
+    # Test A-Z sequence
+    assert_equal 'A', generator.next_name
+    assert_equal 'B', generator.next_name
+
+    # Skip to Z (A=0, B=1, so we need 23 more to get to Y, then one more for Z)
+    23.times { generator.next_name }  # C through Y
+    assert_equal 'Z', generator.next_name
+
+    # Test AA, AB sequence
+    assert_equal 'AA', generator.next_name
+    assert_equal 'AB', generator.next_name
+  end
+
+  # Test ConstantAliasMapping basic functionality
+  def test_constant_alias_mapping_basic
+    mapping = Ruby::Minify::ConstantAliasMapping.new
+
+    # Add definitions
+    mapping.add_definition(:MyClass, definition_type: :class)
+    mapping.add_definition(:AnotherClass, definition_type: :class)
+
+    # Increment usage
+    mapping.increment_usage(:MyClass)
+    mapping.increment_usage(:MyClass)
+    mapping.increment_usage(:AnotherClass)
+
+    # Freeze and assign short names
+    generator = Ruby::Minify::ConstantNameGenerator.new
+    mapping.freeze_mapping(generator)
+
+    # Most used (MyClass) should get 'A'
+    assert_equal 'A', mapping.short_name_for(:MyClass)
+    assert_equal 'B', mapping.short_name_for(:AnotherClass)
+  end
+
+  # Test ConstantAliasMapping skips short names
+  def test_constant_alias_mapping_skips_short_names
+    mapping = Ruby::Minify::ConstantAliasMapping.new
+
+    # 3-char name should be skipped
+    mapping.add_definition(:Foo, definition_type: :class)
+    mapping.increment_usage(:Foo)
+
+    # Long name should be renamed
+    mapping.add_definition(:LongClassName, definition_type: :class)
+    mapping.increment_usage(:LongClassName)
+
+    generator = Ruby::Minify::ConstantNameGenerator.new
+    mapping.freeze_mapping(generator)
+
+    # Short name should not be renamed
+    assert_nil mapping.short_name_for(:Foo)
+
+    # Long name should be renamed
+    assert_equal 'A', mapping.short_name_for(:LongClassName)
+  end
+
+  # ===========================================
+  # Phase 3: User Story 1 - Basic Class Renaming
+  # ===========================================
+
+  # T009: Basic class renaming test
+  def test_constant_aliasing_basic_class
+    code = "class MyClass; def foo; 1; end; end; MyClass.new.foo"
+    minified = minify_code(code, { transform: true })
+
+    # Should rename MyClass to A
+    assert_match(/class A/, minified, "Class should be renamed to A")
+    # Should create alias for original name
+    assert_match(/MyClass=A/, minified, "Should create alias MyClass=A")
+  end
+
+  # T010: Class reference replacement test
+  def test_constant_aliasing_class_reference
+    code = <<~RUBY
+      class UserClass
+        def initialize; end
+      end
+      UserClass.new
+      UserClass.new
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # All references to UserClass should be replaced with short name
+    assert_match(/A\.new/, minified, "Class references should use short name")
+    # Should have alias at the end
+    assert_match(/UserClass=A/, minified, "Should have alias at end")
+  end
+
+  # T011: Alias accessibility test
+  def test_constant_aliasing_alias_accessibility
+    code = <<~RUBY
+      class MyClass
+        def value; 42; end
+      end
+      puts MyClass.new.value
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # Test functional equivalence - original name should work via alias
+    original_output = run_ruby(code)
+    minified_output = run_ruby(minified)
+    assert_equal original_output, minified_output, "Minified code should produce same output"
+  end
+
+  # ===========================================
+  # Phase 4: User Story 2 - Multiple Constants
+  # ===========================================
+
+  # T021: Multiple classes test
+  def test_constant_aliasing_multiple_classes
+    code = <<~RUBY
+      class FirstClass; end
+      class SecondClass; end
+      class ThirdClass; end
+      FirstClass.new
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # Should have renamed all three classes
+    assert_match(/class [A-Z]/, minified, "Classes should be renamed to short names")
+    # Original names should be aliased
+    assert_match(/FirstClass=[A-Z]/, minified, "FirstClass should have alias")
+    assert_match(/SecondClass=[A-Z]/, minified, "SecondClass should have alias")
+    assert_match(/ThirdClass=[A-Z]/, minified, "ThirdClass should have alias")
+  end
+
+  # T022: Frequency order test (most used gets 'A')
+  def test_constant_aliasing_frequency_order
+    code = <<~RUBY
+      class RarelyUsed; end
+      class FrequentlyUsed; end
+      FrequentlyUsed.new
+      FrequentlyUsed.new
+      FrequentlyUsed.new
+      RarelyUsed.new
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # FrequentlyUsed is used 4 times (1 def + 3 refs), RarelyUsed 2 times (1 def + 1 ref)
+    # FrequentlyUsed should get 'A', RarelyUsed should get 'B'
+    assert_match(/FrequentlyUsed=A/, minified, "Most used class should get 'A'")
+    assert_match(/RarelyUsed=B/, minified, "Less used class should get 'B'")
+  end
+
+  # T023: 26+ classes test (AA, AB sequence)
+  def test_constant_aliasing_26plus_classes
+    # Generate 28 class definitions
+    class_defs = (1..28).map { |i| "class LongClassName#{i}; end" }.join("\n")
+    code = class_defs + "\nLongClassName1.new"
+
+    minified = minify_code(code, { transform: true })
+
+    # Should have AA and AB in the aliases (for classes 27 and 28)
+    assert_match(/=AA/, minified, "Should have AA alias for 27th constant")
+    assert_match(/=AB/, minified, "Should have AB alias for 28th constant")
+  end
+
+  # T024: Skip short names test (3 chars or less unchanged)
+  def test_constant_aliasing_skip_short_names
+    code = <<~RUBY
+      class Foo; end
+      class Bar; end
+      class LongClassName; end
+      Foo.new
+      Bar.new
+      LongClassName.new
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # Short names (Foo, Bar) should NOT be renamed
+    assert_match(/class Foo/, minified, "Foo should not be renamed (3 chars)")
+    assert_match(/class Bar/, minified, "Bar should not be renamed (3 chars)")
+    # Long name should be renamed
+    assert_match(/class A/, minified, "LongClassName should be renamed to A")
+    assert_match(/LongClassName=A/, minified, "LongClassName should have alias")
+    # Foo and Bar should not have aliases (they're not renamed)
+    refute_match(/Foo=[A-Z]/, minified, "Foo should not have alias")
+    refute_match(/Bar=[A-Z]/, minified, "Bar should not have alias")
+  end
+
+  # T025: Skip existing short names (collision avoidance)
+  def test_constant_aliasing_skip_existing_names
+    code = <<~RUBY
+      class A; end
+      class LongClassName1; end
+      class LongClassName2; end
+      A.new
+      LongClassName1.new
+      LongClassName2.new
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # A is already defined, so LongClassName1 should get B, LongClassName2 should get C
+    # Note: A is 1 char, which is <= 3, so it won't be renamed anyway
+    assert_match(/class A/, minified, "A should remain unchanged")
+    # The long class names should skip 'A' when assigning short names
+    assert_match(/LongClassName1=B|LongClassName1=C/, minified, "Should skip A for LongClassName1")
+    assert_match(/LongClassName2=B|LongClassName2=C/, minified, "Should skip A for LongClassName2")
+  end
+
+  # T030: ConstantWriteNode (value constants)
+  def test_constant_aliasing_value_constants
+    code = <<~RUBY
+      MAX_RETRIES = 5
+      puts MAX_RETRIES
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # MAX_RETRIES should be renamed
+    assert_match(/[A-Z]=5/, minified, "MAX_RETRIES should be renamed")
+    assert_match(/MAX_RETRIES=[A-Z]/, minified, "Should have alias for MAX_RETRIES")
+  end
+
+  # ===========================================
+  # Phase 5: User Story 3 - Stdlib Preservation
+  # ===========================================
+
+  # T032: Stdlib constants preserved
+  def test_constant_aliasing_stdlib_preserved
+    code = <<~RUBY
+      class MyClass; end
+      arr = Array.new
+      hash = Hash.new
+      str = String.new
+      MyClass.new
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # Stdlib classes should NOT be renamed
+    assert_match(/Array\.new/, minified, "Array should not be renamed")
+    assert_match(/Hash\.new/, minified, "Hash should not be renamed")
+    assert_match(/String\.new/, minified, "String should not be renamed")
+    # User-defined class should be renamed
+    assert_match(/MyClass=A/, minified, "MyClass should be renamed")
+  end
+
+  # Test: External qualified constant should not be aliased even if same simple name exists as user-defined
+  def test_constant_aliasing_qualified_external_not_aliased
+    code = <<~RUBY
+      class Base; end
+      Base.new
+      File::SEPARATOR
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # User-defined Base should be renamed
+    assert_match(/Base=A/, minified, "User-defined Base should be renamed")
+    # File::SEPARATOR should NOT have SEPARATOR aliased (File is external, not user-defined)
+    assert_match(/File::SEPARATOR/, minified, "File::SEPARATOR should preserve original name")
+
+    # Verify it runs correctly
+    minified_output = run_ruby(minified)
+    assert minified_output, "Minified code should execute"
+  end
+
+  # T033: Inheritance preserved
+  def test_constant_aliasing_inheritance_preserved
+    code = <<~RUBY
+      class ParentClass; end
+      class ChildClass < ParentClass; end
+      ParentClass.new
+      ChildClass.new
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # Both classes should be renamed but inheritance should work
+    # ParentClass gets more usage (2: definition + inheritance + .new = 3 vs ChildClass 2)
+    # So ParentClass should get 'A' and ChildClass should get 'B'
+    assert_match(/class A;end/, minified, "ParentClass should be renamed to A")
+    assert_match(/class B<A;end/, minified, "ChildClass should inherit from renamed ParentClass (A)")
+
+    # Verify aliases are generated
+    assert_match(/ParentClass=A/, minified, "ParentClass alias should be generated")
+    assert_match(/ChildClass=B/, minified, "ChildClass alias should be generated")
+
+    # Verify functional equivalence
+    original_output = run_ruby(code)
+    minified_output = run_ruby(minified)
+    assert_equal original_output, minified_output, "Minified code with inheritance should produce same output"
+  end
+
+  # ===========================================
+  # Phase 7: Polish Tests
+  # ===========================================
+
+  # T046: transform: false skips aliasing
+  def test_constant_aliasing_disabled
+    code = "class MyClass; end; MyClass.new"
+    minified = minify_code(code, { transform: false })
+
+    # With transform: false, constant aliasing should be disabled
+    assert_match(/class MyClass/, minified, "MyClass should not be renamed with transform: false")
+    refute_match(/MyClass=[A-Z]/, minified, "Should not have alias with transform: false")
+  end
+
+  # T047: String literals unchanged
+  def test_constant_aliasing_string_literals_unchanged
+    code = <<~RUBY
+      class MyClass; end
+      name = "MyClass"
+      puts name
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # String literal "MyClass" should NOT be changed
+    assert_match(/"MyClass"/, minified, "String literal should not be modified")
+  end
+
+  # T048: Functional equivalence test
+  def test_constant_aliasing_functional_equivalence
+    code = <<~RUBY
+      class Calculator
+        def add(a, b)
+          a + b
+        end
+      end
+      calc = Calculator.new
+      puts calc.add(2, 3)
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    original_output = run_ruby(code)
+    minified_output = run_ruby(minified)
+    assert_equal original_output, minified_output, "Minified code should produce same output"
+  end
+
+  # ===========================================
+  # Phase 6: Module-Scoped Constants Tests
+  # ===========================================
+
+  # T039: Module-scoped class test
+  def test_constant_aliasing_module_scoped_class
+    code = <<~RUBY
+      module MyModule
+        class InnerClass
+          def value; 42; end
+        end
+      end
+      obj = MyModule::InnerClass.new
+      puts obj.value
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # InnerClass should be renamed
+    assert_match(/class [A-Z]/, minified, "InnerClass should be renamed")
+    # MyModule should be renamed (if > 3 chars)
+    assert_match(/module [A-Z]/, minified, "MyModule should be renamed")
+    # Should produce same output
+    original_output = run_ruby(code)
+    minified_output = run_ruby(minified)
+    assert_equal original_output, minified_output, "Module-scoped class should work correctly"
+  end
+
+  # T040: Module alias placement test
+  def test_constant_aliasing_module_alias_placement
+    code = <<~RUBY
+      module MyModule
+        class InnerClass; end
+      end
+      MyModule::InnerClass.new
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # Aliases should be at the end of the output
+    # The key is that the code should be valid and work
+    original_output = run_ruby(code)
+    minified_output = run_ruby(minified)
+    assert_equal original_output, minified_output, "Module alias placement should be correct"
+  end
+
+  # T041: Deep nesting test
+  def test_constant_aliasing_deep_nesting
+    code = <<~RUBY
+      module OuterModule
+        module MiddleModule
+          class DeepClass
+            def value; 123; end
+          end
+        end
+      end
+      obj = OuterModule::MiddleModule::DeepClass.new
+      puts obj.value
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # Should produce same output
+    original_output = run_ruby(code)
+    minified_output = run_ruby(minified)
+    assert_equal original_output, minified_output, "Deep nesting should work correctly"
+  end
+
+  # Test that scope opener uses correct class/module keyword
+  def test_constant_aliasing_scope_opener_keyword
+    code = <<~RUBY
+      class OuterClass
+        class InnerClass
+          def value; 42; end
+        end
+      end
+      OuterClass::InnerClass.new
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # Scope opener should use "class" not "module" for OuterClass
+    # The alias should be like: class A;InnerClass=B;end
+    assert_match(/class [A-Z];InnerClass=[A-Z];end/, minified,
+      "Scope opener should use 'class' keyword for class, not 'module'")
+
+    # Should produce same output
+    original_output = run_ruby(code)
+    minified_output = run_ruby(minified)
+    assert_equal original_output, minified_output, "Class scope opener should work correctly"
+  end
+
+  # Test module-qualified constant reference (Foo::Bar style)
+  def test_constant_aliasing_qualified_reference
+    code = <<~RUBY
+      module Container
+        class MyService
+          def call; "called"; end
+        end
+      end
+      svc = Container::MyService.new
+      puts svc.call
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    original_output = run_ruby(code)
+    minified_output = run_ruby(minified)
+    assert_equal original_output, minified_output, "Qualified constant reference should work"
+  end
+
+  # Test same constant name in different modules (uses TypeProf static_cpath)
+  def test_constant_aliasing_same_name_different_modules
+    code = <<~RUBY
+      module MyModule
+        class InnerClass
+          def value; 42; end
+        end
+      end
+
+      module OtherModule
+        class InnerClass
+          def other; 99; end
+        end
+      end
+
+      obj1 = MyModule::InnerClass.new
+      obj2 = OtherModule::InnerClass.new
+      puts obj1.value
+      puts obj2.other
+    RUBY
+    minified = minify_code(code, { transform: true })
+
+    # Both InnerClass should have different short names
+    # MyModule::InnerClass and OtherModule::InnerClass should be distinct
+    assert_match(/module [A-Z];InnerClass=[A-Z];end;module [A-Z];InnerClass=[A-Z];end/, minified,
+      "Both InnerClass aliases should be present with different values")
+
+    # Should produce same output
+    original_output = run_ruby(code)
+    minified_output = run_ruby(minified)
+    assert_equal original_output, minified_output, "Same name in different modules should work correctly"
+  end
+
+  # Test break with and without argument
+  def test_break_with_argument
+    code = <<~RUBY
+      result = [1, 2, 3].each do |x|
+        break x * 10 if x == 2
+      end
+      puts result
+    RUBY
+    minified = minify_code(code)
+
+    # Should contain break with argument
+    assert_match(/break [a-z]\*10/, minified, "break with argument should be preserved")
+
+    # Should produce same output
+    original_output = run_ruby(code)
+    minified_output = run_ruby(minified)
+    assert_equal original_output, minified_output, "break with argument should work correctly"
+  end
+
+  def test_break_without_argument
+    code = <<~RUBY
+      [1, 2, 3].each do |x|
+        break if x == 2
+        puts x
+      end
+    RUBY
+    minified = minify_code(code)
+
+    # Should contain break without argument (just 'break')
+    assert_match(/break if/, minified, "break without argument should be preserved")
+
+    # Should produce same output
+    original_output = run_ruby(code)
+    minified_output = run_ruby(minified)
+    assert_equal original_output, minified_output, "break without argument should work correctly"
   end
 end
