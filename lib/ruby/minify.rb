@@ -5,6 +5,7 @@ require 'prism'
 require_relative "minify/version"
 require_relative "minify/name_generator"
 require_relative "minify/detector"
+require_relative "minify/method_aliases"
 
 module Ruby
   module Minify
@@ -261,6 +262,8 @@ module Ruby
     def rebuild_node(subnode)
       case subnode
       when TypeProf::Core::AST::CallNode
+        # Get potentially shortened method name
+        method_name = transform_method_name(subnode)
         if middle_method?(subnode.mid)
           "#{rebuild_node(subnode.recv)}#{subnode.mid}#{rebuild_node(subnode.positional_args.first)}"
         elsif with_block_method?(subnode)
@@ -277,9 +280,9 @@ module Ruby
               "|#{mangled_block_params.join(',')}|"
             end
             block_body = rebuild_statement(subnode.block_body)
-            "#{subnode.recv.nil? ? '' : "#{rebuild_node(subnode.recv)}."}#{subnode.mid}#{subnode.positional_args.empty? ? '' : "(#{subnode.positional_args.map{rebuild_node(_1)}.join(',')})"}{#{block_params_str}#{block_body}}"
+            "#{subnode.recv.nil? ? '' : "#{rebuild_node(subnode.recv)}."}#{method_name}#{subnode.positional_args.empty? ? '' : "(#{subnode.positional_args.map{rebuild_node(_1)}.join(',')})"}{#{block_params_str}#{block_body}}"
           elsif !subnode.block_pass.nil?
-            "#{subnode.recv.nil? ? '' : "#{rebuild_node(subnode.recv)}."}#{subnode.mid}#{subnode.positional_args.empty? ? '' : "(#{subnode.positional_args.map{rebuild_node(_1)}.join(',')})"}(&#{rebuild_node(subnode.block_pass)})"
+            "#{subnode.recv.nil? ? '' : "#{rebuild_node(subnode.recv)}."}#{method_name}#{subnode.positional_args.empty? ? '' : "(#{subnode.positional_args.map{rebuild_node(_1)}.join(',')})"}(&#{rebuild_node(subnode.block_pass)})"
           end
         elsif subnode.mid == '[]'.to_sym
           "#{rebuild_node(subnode.recv)}[#{subnode.positional_args.map{rebuild_node(_1)}.join(',')}]"
@@ -288,7 +291,7 @@ module Ruby
         elsif subnode.mid == '!'.to_sym
           "!#{rebuild_node(subnode.recv)}"
         else
-          "#{subnode.recv.nil? ? '' : "#{rebuild_node(subnode.recv)}."}#{subnode.mid}#{subnode.positional_args.empty? ? '' : "(#{subnode.positional_args.map{rebuild_node(_1)}.join(',')})"}"
+          "#{subnode.recv.nil? ? '' : "#{rebuild_node(subnode.recv)}."}#{method_name}#{subnode.positional_args.empty? ? '' : "(#{subnode.positional_args.map{rebuild_node(_1)}.join(',')})"}"
         end
       when TypeProf::Core::AST::DefNode
         # Get mangled params using TypeProf's lenv.cref
@@ -458,7 +461,11 @@ module Ruby
         ":#{subnode.lit}"
       when TypeProf::Core::AST::HashNode
         "{" + subnode.keys.zip(subnode.vals).map do |key, val|
-          "#{rebuild_node(key)}=>#{rebuild_node(val)}"
+          key_str = rebuild_node(key)
+          # Symbol keys ending with ? or ! need space before => to avoid syntax errors
+          # e.g., :has_key?=> is invalid, but :has_key? => is valid
+          separator = (key.is_a?(TypeProf::Core::AST::SymbolNode) && key.lit.to_s.end_with?('?', '!')) ? ' =>' : '=>'
+          "#{key_str}#{separator}#{rebuild_node(val)}"
         end.join(',') + "}"
       when TypeProf::Core::AST::InterpolatedStringNode
         "\"" + subnode.parts.map do |part|
@@ -542,6 +549,100 @@ module Ruby
 
     def with_block_method?(node)
       !(node.block_body.nil? && node.block_pass.nil?)
+    end
+
+    # Check if transform option is enabled (default: true)
+    def transform_enabled?
+      @options.fetch(:transform, true)
+    end
+
+    # Get receiver type from AST node for method alias replacement
+    # Returns class symbol (:Array, :Hash, etc.) or :unknown
+    def get_receiver_type(recv_node)
+      return :unknown unless recv_node
+
+      # Handle StatementsNode wrapper (e.g., from parenthesized expressions like (-5))
+      if recv_node.is_a?(TypeProf::Core::AST::StatementsNode) && recv_node.stmts.size == 1
+        return get_receiver_type(recv_node.stmts.first)
+      end
+
+      # Handle method chaining: for CallNode, infer return type from receiver's type
+      # Methods like select/find_all/collect on Array return Array
+      if recv_node.is_a?(TypeProf::Core::AST::CallNode)
+        receiver_type = get_receiver_type(recv_node.recv)
+        method_name = recv_node.mid
+
+        # Hash methods that return Hash (check first to avoid misclassification)
+        # Hash#select, Hash#reject, Hash#compact return Hash, not Array
+        hash_returning_methods = [:select, :reject, :transform_keys, :transform_values,
+                                  :merge, :compact, :invert, :slice, :except]
+        if hash_returning_methods.include?(method_name) && receiver_type == :Hash
+          return :Hash
+        end
+
+        # Enumerable methods that return Array
+        # Note: Hash is excluded here because Hash#select etc. return Hash (handled above)
+        array_returning_methods = [:select, :find_all, :collect, :map, :reject,
+                                   :sort, :sort_by, :take, :drop, :flatten,
+                                   :compact, :uniq, :reverse, :shuffle, :sample,
+                                   :flat_map, :collect_concat, :grep, :zip]
+        if array_returning_methods.include?(method_name) && ENUMERABLE_CLASSES.include?(receiver_type) && receiver_type != :Hash
+          return :Array
+        end
+
+        # String methods that return String
+        string_returning_methods = [:upcase, :downcase, :capitalize, :reverse,
+                                    :strip, :chomp, :chop, :sub, :gsub, :tr]
+        if string_returning_methods.include?(method_name) && receiver_type == :String
+          return :String
+        end
+
+        # No explicit return type mapping found - return :unknown
+        # Do NOT fall back to receiver_type as many methods don't return self
+        # (e.g., Array#first returns element, not Array)
+        return :unknown
+      end
+
+      AST_TO_CLASS[recv_node.class] || :unknown
+    end
+
+    # Check if receiver type supports the alias replacement
+    # Handles Enumerable inheritance for Array, Hash, Range, etc.
+    def type_supports_alias?(receiver_type, alias_classes)
+      return false if receiver_type == :unknown
+
+      # Direct class match
+      return true if alias_classes.include?(receiver_type)
+
+      # Enumerable inheritance: if alias is for Enumerable, check if type is Enumerable
+      if alias_classes.include?(:Enumerable) && ENUMERABLE_CLASSES.include?(receiver_type)
+        return true
+      end
+
+      # Object methods apply to all classes
+      return true if alias_classes.include?(:Object)
+
+      # Numeric inheritance: Integer and Float are Numeric
+      if alias_classes.include?(:Numeric) && [:Integer, :Float].include?(receiver_type)
+        return true
+      end
+
+      false
+    end
+
+    # Transform method name to shorter alias if applicable
+    # Returns shorter alias or original method name
+    def transform_method_name(node)
+      method_name = node.mid
+      return method_name unless transform_enabled?
+
+      alias_info = METHOD_ALIASES[method_name]
+      return method_name unless alias_info
+
+      receiver_type = get_receiver_type(node.recv)
+      return method_name unless type_supports_alias?(receiver_type, alias_info[:classes])
+
+      alias_info[:shorter]
     end
 
     def output(path = @path)

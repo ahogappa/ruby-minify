@@ -9,6 +9,8 @@
 *.min.rb
 
 specs
+.serena/
 .specify
 .claude
 .DS_Store
+CLAUDE.md
