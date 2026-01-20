@@ -595,7 +595,9 @@ module Ruby
           return :String
         end
 
-        return receiver_type if receiver_type != :unknown
+        # No explicit return type mapping found - return :unknown
+        # Do NOT fall back to receiver_type as many methods don't return self
+        # (e.g., Array#first returns element, not Array)
         return :unknown
       end
 
