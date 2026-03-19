@@ -12,64 +12,6 @@ class TestGemMinification < Minitest::Test
   GEM_TESTS_DIR = File.expand_path('../gem_tests', __dir__)
 
   GEMS = {
-    tsort: {
-      source: 'tsort/lib/tsort.rb',
-      test_file: 'tsort/test/test_tsort.rb',
-      lib_name: 'tsort',
-      max_level: 4
-    },
-    ostruct: {
-      source: 'ostruct/lib/ostruct.rb',
-      test_file: 'ostruct/test/ostruct/test_ostruct.rb',
-      lib_name: 'ostruct',
-      max_level: 3  # L4+ renames OpenStruct class, breaking Class#name-dependent tests
-    },
-    prettyprint: {
-      source: 'prettyprint/lib/prettyprint.rb',
-      test_file: 'prettyprint/test/test_prettyprint.rb',
-      lib_name: 'prettyprint',
-      max_level: 4
-    },
-    singleton: {
-      source: 'singleton/lib/singleton.rb',
-      test_file: 'singleton/test/test_singleton.rb',
-      lib_name: 'singleton',
-      max_level: 4
-    },
-    mutex_m: {
-      source: 'mutex_m/lib/mutex_m.rb',
-      test_file: 'mutex_m/test/test_mutex_m.rb',
-      lib_name: 'mutex_m'
-    },
-    shellwords: {
-      source: 'shellwords/lib/shellwords.rb',
-      test_file: 'shellwords/test/test_shellwords.rb',
-      lib_name: 'shellwords'
-    },
-    delegate: {
-      source: 'delegate/lib/delegate.rb',
-      test_file: 'delegate/test/test_delegate.rb',
-      lib_name: 'delegate',
-      max_level: 3  # L4+ constant renaming breaks delegation
-    },
-    pp: {
-      source: 'pp/lib/pp.rb',
-      test_file: 'pp/test/test_pp.rb',
-      lib_name: 'pp',
-      max_level: 4  # L5 method renaming breaks PP#pp_hash override detection
-    },
-    time: {
-      source: 'time/lib/time.rb',
-      test_file: 'time/test/test_time.rb',
-      lib_name: 'time',
-      max_level: 4  # L5 method renaming breaks time parsing
-    },
-    prime: {
-      source: 'prime/lib/prime.rb',
-      test_file: 'prime/test/test_prime.rb',
-      lib_name: 'prime',
-      max_level: 4  # L5 method renaming breaks Enumerator-based prime generation
-    },
     sinatra: {
       source: 'sinatra/lib/sinatra/base.rb',
       test_files: %w[

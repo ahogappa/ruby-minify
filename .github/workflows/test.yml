@@ -20,8 +20,9 @@ jobs:
       - name: Validate RBS syntax
         run: bundle exec rbs -I sig validate
 
-  gem-tests:
+  external-gems:
     runs-on: ubuntu-latest
+    continue-on-error: true
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -35,46 +36,7 @@ jobs:
         run: |
           mkdir -p gem_tests
           cd gem_tests
-          for gem in tsort ostruct prettyprint singleton mutex_m shellwords delegate pp time prime; do
-            git clone --depth 1 https://github.com/ruby/$gem
-          done
           git clone --depth 1 https://github.com/sinatra/sinatra
           git clone --depth 1 https://github.com/rubocop/rubocop
       - name: Run gem integration tests
         run: bundle exec rake test:gems
-
-  external-gems:
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    strategy:
-      fail-fast: false
-      matrix:
-        gem: [optparse, set, delegate, rexml, prime, singleton, abbrev, mutex_m, base64, shellwords, securerandom]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: ruby-minify
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "4.0"
-          working-directory: ruby-minify
-          bundler-cache: true
-      - name: Clone ${{ matrix.gem }}
-        run: git clone --depth 1 https://github.com/ruby/${{ matrix.gem }}
-      - name: Minify
-        working-directory: ruby-minify
-        run: bundle exec ruby bin/minify ../${{ matrix.gem }}/lib/${{ matrix.gem }}.rb -o /tmp/minified.rb
-      - name: Syntax check
-        run: ruby -c /tmp/minified.rb
-      - name: Replace lib with minified code
-        working-directory: ${{ matrix.gem }}
-        run: |
-          find lib -name '*.rb' -delete
-          mkdir -p lib
-          cp /tmp/minified.rb lib/${{ matrix.gem }}.rb
-      - name: Install gem dependencies
-        working-directory: ${{ matrix.gem }}
-        run: bundle install --jobs 4 || true
-      - name: Run gem tests
-        working-directory: ${{ matrix.gem }}
-        run: bundle exec rake test

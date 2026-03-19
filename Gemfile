@@ -7,9 +7,7 @@ gemspec
 
 gem "rake", "~> 13.0"
 
-# gem 'typeprof', github: 'ruby/typeprof'
-
-gem 'typeprof', :path => '/workspace/typeprof'
+gem 'typeprof', github: 'ruby/typeprof'
 
 gem 'prism'
 
