@@ -135,11 +135,11 @@ class TestGemMinification < Minitest::Test
     minifier = RubyMinify::Minifier.new
     result = minifier.call(source_path, level: level)
 
-    content = if result.aliases.empty?
-      result.content
-    else
-      "#{result.content};#{result.aliases}"
-    end
+    parts = []
+    parts << result.preamble unless result.preamble.empty?
+    parts << result.content
+    parts << result.aliases unless result.aliases.empty?
+    content = parts.join(';')
 
     Dir.mktmpdir("minify_gem_test") do |tmpdir|
       # file_depth: nest the minified file N levels deep so __FILE__-relative
