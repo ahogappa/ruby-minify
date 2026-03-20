@@ -128,12 +128,14 @@ module RubyMinify
       raise "Already finalized" if finalized?
 
       @state = :frozen
+      prefix_counts = @prefix_counts
+      @prefix_counts = nil
 
       # Collect all existing constant names for collision checking
       existing_names = Set.new(@mappings.values.map { |info| info.original_name.to_s })
 
       # Build external prefix candidates with preamble-induced parent refs
-      prefix_candidates = build_prefix_candidates
+      prefix_candidates = build_prefix_candidates(prefix_counts)
 
       # Build unified allocation list: [estimated_savings, :internal/:external, object]
       entries = []
@@ -239,6 +241,11 @@ module RubyMinify
       info && (info.definition_type == :class || info.definition_type == :module)
     end
 
+    # Check if any sub-prefix of the path is user-defined
+    def has_user_defined_prefix?(full_path)
+      (1...full_path.size).any? { |i| user_defined_path?(full_path[0...i]) }
+    end
+
     # Add an external prefix reference count (e.g., [:TypeProf, :Core, :AST] with count 20)
     def add_external_prefix(prefix_path, usage_count:)
       raise "Cannot add external prefix when finalized" if finalized?
@@ -257,7 +264,7 @@ module RubyMinify
     # Generate prefix declaration statements (e.g., ["Z=TypeProf::Core::AST"])
     # Uses chained aliases when a sub-prefix is also aliased
     def generate_prefix_declarations
-      sorted = @external_prefixes.values.sort_by { |info| [info.prefix_path.size, -(info.char_savings || 0)] }
+      sorted = @external_prefixes.values.sort_by { |info| [info.prefix_path.size, -info.char_savings] }
 
       alias_map = {}
       sorted.map do |info|
@@ -280,9 +287,9 @@ module RubyMinify
     # Build external prefix candidates, including preamble-induced parent prefixes.
     # This pre-calculates ALL prefix references (code + preamble-induced) before
     # allocation, ensuring idempotent output by construction.
-    def build_prefix_candidates
+    def build_prefix_candidates(prefix_counts)
       # Calculate savings for each prefix
-      all_prefixes = @prefix_counts.map do |prefix, count|
+      all_prefixes = prefix_counts.map do |prefix, count|
         prefix_string = prefix.map(&:to_s).join('::')
         savings_per_use = prefix_string.length - 1
         declaration_cost = 1 + 1 + prefix_string.length + 1
@@ -309,9 +316,10 @@ module RubyMinify
       end
 
       # Add parent prefixes that become beneficial with preamble-induced refs
+      beneficial_paths = Set.new(beneficial.map(&:prefix_path))
       parent_extra.each do |parent, preamble_refs|
-        next if beneficial.any? { |info| info.prefix_path == parent }
-        code_refs = @prefix_counts[parent] || 0
+        next if beneficial_paths.include?(parent)
+        code_refs = prefix_counts[parent] || 0
         total = code_refs + preamble_refs
 
         parent_string = parent.map(&:to_s).join('::')

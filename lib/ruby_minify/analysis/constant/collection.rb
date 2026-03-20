@@ -189,8 +189,7 @@ module RubyMinify
                         (resolved_cpath && @constant_mapping.user_defined_path?(resolved_cpath))
       if full_path && !is_user_defined
         next if full_path.size < 2
-        # Skip if any sub-prefix is user-defined
-        next if (1...full_path.size).any? { |i| @constant_mapping.user_defined_path?(full_path[0...i]) }
+        next if @constant_mapping.has_user_defined_prefix?(full_path)
         prefix = full_path[0...-1]
         prefix_counts[prefix] += 1
       end
