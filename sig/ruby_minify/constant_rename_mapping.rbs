@@ -47,7 +47,6 @@ module RubyMinify
 
     private
 
-    def build_prefix_candidates: () -> Array[ExternalPrefixInfo]
     def runtime_constant?: (Array[Symbol] cpath) -> bool
     def build_alias_declaration: (ConstantInfo info) -> String?
   end

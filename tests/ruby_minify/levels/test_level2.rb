@@ -18,7 +18,7 @@ class TestLevel2 < Minitest::Test
       "class Base;",
       "def parent_info =\"base\";",
       "end;",
-      "class Calculator<Base;B=256;D=%w[low medium high].freeze;C=%i[add subtract multiply].freeze;",
+      "class Calculator<Base;B=256;E=%w[low medium high].freeze;D=%i[add subtract multiply].freeze;",
       "attr_reader :current_value;",
       "attr_accessor :label;",
       "def initialize(initial_value,label:\"default\") =(@current_value=initial_value;@label=label;@history=[];@@instance_count||=0;@@instance_count+=1;$last_calculator=self);",
@@ -134,15 +134,15 @@ class TestLevel2 < Minitest::Test
       "puts fmt.format_flag(!1);",
       "doubled=MathUtils.double_value Calculator::B;",
       "puts doubled;",
+      "puts Calculator::E.inspect;",
       "puts Calculator::D.inspect;",
-      "puts Calculator::C.inspect;",
-      "puts E::Status.name;",
-      "puts E::Sys.name;",
-      "puts E::UID.name;",
-      "puts E::GID.name"
+      "puts C::Status.name;",
+      "puts C::Sys.name;",
+      "puts C::UID.name;",
+      "puts C::GID.name"
     ].join('')
     assert_equal expected, result.code
-    assert_equal 'E=Process', result.preamble
-    assert_equal 'Calculator::LABELS=Calculator::D;Calculator::OFFSET=Calculator::B;Calculator::SYMBOLS=Calculator::C;MathUtils::MULTIPLIER=MathUtils::A', result.aliases
+    assert_equal 'C=Process', result.preamble
+    assert_equal 'Calculator::LABELS=Calculator::E;Calculator::OFFSET=Calculator::B;Calculator::SYMBOLS=Calculator::D;MathUtils::MULTIPLIER=MathUtils::A', result.aliases
   end
 end

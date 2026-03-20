@@ -48,8 +48,6 @@ module RubyMinify
   # constants with same name in different modules.
   # Also tracks external prefix aliases (absorbed from ExternalPrefixAliaser).
   class ConstantRenameMapping
-    MIN_PREFIX_SAVINGS_THRESHOLD = 10
-
     attr_reader :mappings, :used_short_names
 
     def initialize
@@ -131,27 +129,32 @@ module RubyMinify
       prefix_counts = @prefix_counts
       @prefix_counts = nil
 
-      # Collect all existing constant names for collision checking
-      existing_names = Set.new(@mappings.values.map { |info| info.original_name.to_s })
+      existing_names = @mappings.each_value.with_object(Set.new) { |info, s| s << info.original_name.to_s }
 
-      # Build external prefix candidates with preamble-induced parent refs
-      prefix_candidates = build_prefix_candidates(prefix_counts)
+      # Augment prefix counts with preamble-induced parent refs:
+      # each prefix's declaration (e.g., C5=RuboCop::Cop) references its parent.
+      # Adding unconditionally avoids the chicken-and-egg problem of needing to
+      # know which children are aliased before counting parent refs.
+      prefix_counts.keys.each do |prefix|
+        next if prefix.size < 2
+        prefix_counts[prefix[0...-1]] += 1
+      end
 
-      # Build unified allocation list: [estimated_savings, :internal/:external, object]
+      # Build unified allocation list: [gross_savings_estimate, :internal/:external, object]
       entries = []
 
       @mappings.each_value do |info|
         next if skip_class_modules && info.definition_type != :value
         next if info.definition_type != :value && runtime_constant?(info.full_path)
-        savings = info.original_name.to_s.length * (info.usage_count + 1)
-        entries << [savings, :internal, info]
+        entries << [info.original_name.to_s.length * (info.usage_count + 1), :internal, info]
       end
 
-      prefix_candidates.each do |info|
-        entries << [info.char_savings, :external, info]
+      prefix_counts.each do |prefix, count|
+        prefix_string = prefix.map(&:to_s).join('::')
+        info = ExternalPrefixInfo.new(prefix_path: prefix, prefix_string: prefix_string, usage_count: count)
+        entries << [prefix_string.length * count, :external, info]
       end
 
-      # Sort by estimated savings descending
       entries.sort_by! { |e| -e[0] }
 
       # Allocate names in one pass
@@ -164,22 +167,18 @@ module RubyMinify
 
         case kind
         when :internal
-          original_len = info.original_name.to_s.length
-          saved_per_use = original_len - candidate.length
-          next unless saved_per_use > 0
-          total_occurrences = info.usage_count + 1
-          next unless saved_per_use * total_occurrences > 0
+          next unless info.original_name.to_s.length - candidate.length > 0
           info.short_name = candidate
           @used_short_names << candidate
 
         when :external
-          actual_savings_per_use = info.prefix_string.length - candidate.length
-          next unless actual_savings_per_use > 0
-          actual_declaration_cost = candidate.length + 1 + info.prefix_string.length + 1
-          actual_net_savings = (actual_savings_per_use * info.usage_count) - actual_declaration_cost
-          next unless actual_net_savings > 0
+          saved_per_use = info.prefix_string.length - candidate.length
+          next unless saved_per_use > 0
+          declaration_cost = candidate.length + 1 + info.prefix_string.length + 1
+          net_savings = (saved_per_use * info.usage_count) - declaration_cost
+          next unless net_savings > 0
           info.short_name = candidate
-          info.char_savings = actual_net_savings
+          info.char_savings = net_savings
           existing_names << candidate
           @external_prefixes[info.prefix_path] = info
         end
@@ -283,59 +282,6 @@ module RubyMinify
     end
 
     private
-
-    # Build external prefix candidates, including preamble-induced parent prefixes.
-    # This pre-calculates ALL prefix references (code + preamble-induced) before
-    # allocation, ensuring idempotent output by construction.
-    def build_prefix_candidates(prefix_counts)
-      # Calculate savings for each prefix
-      all_prefixes = prefix_counts.map do |prefix, count|
-        prefix_string = prefix.map(&:to_s).join('::')
-        savings_per_use = prefix_string.length - 1
-        declaration_cost = 1 + 1 + prefix_string.length + 1
-        net_savings = (savings_per_use * count) - declaration_cost
-
-        ExternalPrefixInfo.new(
-          prefix_path: prefix,
-          prefix_string: prefix_string,
-          usage_count: count,
-          char_savings: net_savings
-        )
-      end
-
-      # Filter to beneficial prefixes
-      beneficial = all_prefixes.select { |info| info.char_savings >= MIN_PREFIX_SAVINGS_THRESHOLD }
-
-      # Pre-calculate preamble-induced parent prefix references:
-      # each beneficial prefix's declaration references its parent prefix
-      parent_extra = Hash.new(0)
-      beneficial.each do |info|
-        next if info.prefix_path.size < 2
-        parent = info.prefix_path[0...-1]
-        parent_extra[parent] += 1
-      end
-
-      # Add parent prefixes that become beneficial with preamble-induced refs
-      beneficial_paths = Set.new(beneficial.map(&:prefix_path))
-      parent_extra.each do |parent, preamble_refs|
-        next if beneficial_paths.include?(parent)
-        code_refs = prefix_counts[parent] || 0
-        total = code_refs + preamble_refs
-
-        parent_string = parent.map(&:to_s).join('::')
-        optimistic_savings = (parent_string.length - 1) * total - (1 + 1 + parent_string.length + 1)
-        next unless optimistic_savings >= MIN_PREFIX_SAVINGS_THRESHOLD
-
-        beneficial << ExternalPrefixInfo.new(
-          prefix_path: parent,
-          prefix_string: parent_string,
-          usage_count: total,
-          char_savings: optimistic_savings
-        )
-      end
-
-      beneficial
-    end
 
     # Check if a constant path already exists in the Ruby runtime.
     # Used to detect class/module reopenings (e.g., `class Array` adding methods

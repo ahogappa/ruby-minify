@@ -14,10 +14,10 @@ class TestLevel5 < Minitest::Test
       "def self.a(a) =a*C*S;",
       "def self.b(a,b,c) =a<b ? b : a>c ? c : a;",
       "end;",
-      "class H;",
+      "class I;",
       "def q =\"base\";",
       "end;",
-      "class A<H;E=256;G=%w[low medium high].freeze;F=%i[add subtract multiply].freeze;attr :p;attr :b1,!!1;",
+      "class A<I;E=256;H=%w[low medium high].freeze;G=%i[add subtract multiply].freeze;attr :p;attr :b1,!!1;",
       "def initialize(b,a:\"default\") =(@p=b;@b1=a;@a=[];@@a||=0;@@a+=1;$a=self);",
       "def t(b,a:!1) =(@p=@p+b;@a.push b;a ? \"added\":\"silent\");",
       "def subtract_number(a) =@p-a;",
@@ -130,15 +130,15 @@ class TestLevel5 < Minitest::Test
       "puts b.a(!1);",
       "c=B.a A::E;",
       "puts c;",
+      "puts A::H.inspect;",
       "puts A::G.inspect;",
-      "puts A::F.inspect;",
-      "puts I::Status.name;",
-      "puts I::Sys.name;",
-      "puts I::UID.name;",
-      "puts I::GID.name"
+      "puts F::Status.name;",
+      "puts F::Sys.name;",
+      "puts F::UID.name;",
+      "puts F::GID.name"
     ].join('')
     assert_equal expected, result.code
-    assert_equal 'I=Process', result.preamble
-    assert_equal 'Base=H;Calculator=A;Formatter=D;MathUtils=B;A::LABELS=A::G;A::OFFSET=A::E;A::SYMBOLS=A::F;B::MULTIPLIER=B::C', result.aliases
+    assert_equal 'F=Process', result.preamble
+    assert_equal 'Base=I;Calculator=A;Formatter=D;MathUtils=B;A::LABELS=A::H;A::OFFSET=A::E;A::SYMBOLS=A::G;B::MULTIPLIER=B::C', result.aliases
   end
 end
