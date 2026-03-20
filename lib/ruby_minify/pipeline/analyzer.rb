@@ -30,7 +30,6 @@ module RubyMinify
           prism_ast: prism_result.value,
           scope_mappings: {},
           constant_mapping: nil,
-          external_prefix_aliaser: nil,
           rename_map: {},
           method_alias_map: {},
           method_transform_map: {},
@@ -146,9 +145,6 @@ module RubyMinify
         exclude_private_constants(nodes)
         count_constant_references(nodes)
         augment_constant_counts_via_typeprof(genv)
-
-        user_defined_paths = Set.new(@constant_mapping.mappings.keys)
-        @external_prefix_aliaser = ExternalPrefixAliaser.new(user_defined_paths)
         collect_external_references(nodes)
       end
 
@@ -168,7 +164,6 @@ module RubyMinify
           prism_ast: prism_result.value,
           scope_mappings: @scope_mappings,
           constant_mapping: @constant_mapping,
-          external_prefix_aliaser: @external_prefix_aliaser,
           rename_map: rename_map,
           method_alias_map: method_alias_map,
           method_transform_map: method_transform_map,

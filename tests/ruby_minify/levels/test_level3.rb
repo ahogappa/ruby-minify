@@ -135,13 +135,13 @@ class TestLevel3 < Minitest::Test
       "puts c;",
       "puts Calculator::D.inspect;",
       "puts Calculator::C.inspect;",
-      "puts F::Status.name;",
-      "puts F::Sys.name;",
-      "puts F::UID.name;",
-      "puts F::GID.name"
+      "puts E::Status.name;",
+      "puts E::Sys.name;",
+      "puts E::UID.name;",
+      "puts E::GID.name"
     ].join('')
     assert_equal expected, result.code
-    assert_equal 'F=Process', result.preamble
+    assert_equal 'E=Process', result.preamble
     assert_equal 'Calculator::LABELS=Calculator::D;Calculator::OFFSET=Calculator::B;Calculator::SYMBOLS=Calculator::C;MathUtils::MULTIPLIER=MathUtils::A', result.aliases
   end
 end

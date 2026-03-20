@@ -169,6 +169,8 @@ module RubyMinify
 
   def collect_external_references(nodes)
     cbase_ids = Set.new
+    prefix_counts = Hash.new(0)
+
     nodes.body.traverse do |event, node|
       next unless event == :enter
       next unless node.is_a?(TypeProf::Core::AST::ConstantReadNode)
@@ -186,8 +188,16 @@ module RubyMinify
       is_user_defined = (full_path && @constant_mapping.user_defined_path?(full_path)) ||
                         (resolved_cpath && @constant_mapping.user_defined_path?(resolved_cpath))
       if full_path && !is_user_defined
-        @external_prefix_aliaser.collect_reference(full_path)
+        next if full_path.size < 2
+        # Skip if any sub-prefix is user-defined
+        next if (1...full_path.size).any? { |i| @constant_mapping.user_defined_path?(full_path[0...i]) }
+        prefix = full_path[0...-1]
+        prefix_counts[prefix] += 1
       end
+    end
+
+    prefix_counts.each do |prefix, count|
+      @constant_mapping.add_external_prefix(prefix, usage_count: count)
     end
   end
 end

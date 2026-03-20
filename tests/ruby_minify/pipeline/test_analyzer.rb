@@ -11,7 +11,6 @@ class TestAnalyzer < Minitest::Test
     result = RubyMinify::Pipeline::Analyzer.prism_only_from_string("x = 1\n")
     assert_equal({}, result.scope_mappings)
     assert_nil result.constant_mapping
-    assert_nil result.external_prefix_aliaser
     assert_equal({}, result.rename_map)
     assert_equal({}, result.method_alias_map)
     assert_equal({}, result.method_transform_map)

@@ -132,13 +132,13 @@ class TestLevel5 < Minitest::Test
       "puts c;",
       "puts A::G.inspect;",
       "puts A::F.inspect;",
-      "puts J::Status.name;",
-      "puts J::Sys.name;",
-      "puts J::UID.name;",
-      "puts J::GID.name"
+      "puts I::Status.name;",
+      "puts I::Sys.name;",
+      "puts I::UID.name;",
+      "puts I::GID.name"
     ].join('')
     assert_equal expected, result.code
-    assert_equal 'J=Process', result.preamble
+    assert_equal 'I=Process', result.preamble
     assert_equal 'Base=H;Calculator=A;Formatter=D;MathUtils=B;A::LABELS=A::G;A::OFFSET=A::E;A::SYMBOLS=A::F;B::MULTIPLIER=B::C', result.aliases
   end
 end
