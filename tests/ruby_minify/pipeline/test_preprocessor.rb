@@ -66,7 +66,15 @@ class TestPreprocessor < Minitest::Test
   end
 
   def test_sole_nested_conditional
-    assert_equal "c if a && b\n", preprocess("if a\n  if b\n    c\n  end\nend\n")
+    # SoleNestedConditional merges nested ifs, but IfUnlessModifier is not
+    # applied here — ControlFlowSimplify handles modifier form post-compaction.
+    assert_equal "if a && b\n    c\n  end\n", preprocess("if a\n  if b\n    c\n  end\nend\n")
+  end
+
+  def test_if_unless_modifier_not_applied
+    # Modifier-form conversion is handled by ControlFlowSimplify, not Preprocessor.
+    code = "if condition\n  do_something\nend\n"
+    assert_equal code, preprocess(code)
   end
 
   def test_unless_else_rewritten

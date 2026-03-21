@@ -14,7 +14,6 @@ module RubyMinify
         Style/Proc
         Style/Not
         Style/Strip
-        Style/IfUnlessModifier
         Style/UnlessElse
         Style/EmptyLiteral
         Style/RedundantSortBy
@@ -68,9 +67,6 @@ module RubyMinify
         'Style/SoleNestedConditional' => { 'AllowModifier' => false }
       }.freeze
 
-      # IfUnlessModifier depends on LineLength to check modifier-form length
-      REGISTRY_COPS = (COPS + %w[Layout/LineLength]).freeze
-
       # @param source [ConcatenatedSource] From Stage 2
       # @return [ConcatenatedSource] Autocorrected source
       def call(source)
@@ -120,7 +116,7 @@ module RubyMinify
       def cop_registry
         @cop_registry ||= begin
           global = RuboCop::Cop::Registry.global
-          classes = REGISTRY_COPS.filter_map { |name| global.find_by_cop_name(name) }
+          classes = COPS.filter_map { |name| global.find_by_cop_name(name) }
           RuboCop::Cop::Registry.new(classes)
         end
       end
@@ -129,7 +125,6 @@ module RubyMinify
         @rubocop_config ||= begin
           hash = RuboCop::ConfigLoader.default_configuration.to_h.dup
           hash['AllCops'] = hash['AllCops'].merge('DisabledByDefault' => true, 'NewCops' => 'disable')
-          hash['Layout/LineLength'] = (hash['Layout/LineLength'] || {}).merge('Enabled' => true, 'Max' => 10_000)
           COPS.each { |cop| hash[cop] = (hash[cop] || {}).merge('Enabled' => true) }
           CUSTOM_CONFIG.each { |cop, config| hash[cop] = (hash[cop] || {}).merge(config) }
           RuboCop::Config.new(hash)
