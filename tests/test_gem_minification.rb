@@ -12,64 +12,6 @@ class TestGemMinification < Minitest::Test
   GEM_TESTS_DIR = File.expand_path('../gem_tests', __dir__)
 
   GEMS = {
-    tsort: {
-      source: 'tsort/lib/tsort.rb',
-      test_file: 'tsort/test/test_tsort.rb',
-      lib_name: 'tsort',
-      max_level: 4
-    },
-    ostruct: {
-      source: 'ostruct/lib/ostruct.rb',
-      test_file: 'ostruct/test/ostruct/test_ostruct.rb',
-      lib_name: 'ostruct',
-      max_level: 3  # L4+ renames OpenStruct class, breaking Class#name-dependent tests
-    },
-    prettyprint: {
-      source: 'prettyprint/lib/prettyprint.rb',
-      test_file: 'prettyprint/test/test_prettyprint.rb',
-      lib_name: 'prettyprint',
-      max_level: 4
-    },
-    singleton: {
-      source: 'singleton/lib/singleton.rb',
-      test_file: 'singleton/test/test_singleton.rb',
-      lib_name: 'singleton',
-      max_level: 4
-    },
-    mutex_m: {
-      source: 'mutex_m/lib/mutex_m.rb',
-      test_file: 'mutex_m/test/test_mutex_m.rb',
-      lib_name: 'mutex_m'
-    },
-    shellwords: {
-      source: 'shellwords/lib/shellwords.rb',
-      test_file: 'shellwords/test/test_shellwords.rb',
-      lib_name: 'shellwords'
-    },
-    delegate: {
-      source: 'delegate/lib/delegate.rb',
-      test_file: 'delegate/test/test_delegate.rb',
-      lib_name: 'delegate',
-      max_level: 3  # L4+ constant renaming breaks delegation
-    },
-    pp: {
-      source: 'pp/lib/pp.rb',
-      test_file: 'pp/test/test_pp.rb',
-      lib_name: 'pp',
-      max_level: 4  # L5 method renaming breaks PP#pp_hash override detection
-    },
-    time: {
-      source: 'time/lib/time.rb',
-      test_file: 'time/test/test_time.rb',
-      lib_name: 'time',
-      max_level: 4  # L5 method renaming breaks time parsing
-    },
-    prime: {
-      source: 'prime/lib/prime.rb',
-      test_file: 'prime/test/test_prime.rb',
-      lib_name: 'prime',
-      max_level: 4  # L5 method renaming breaks Enumerator-based prime generation
-    },
     sinatra: {
       source: 'sinatra/lib/sinatra/base.rb',
       test_files: %w[
@@ -115,6 +57,7 @@ class TestGemMinification < Minitest::Test
       lib_name: 'sinatra/base',
       extra_includes: ['sinatra/rack-protection/lib'],
       copy_files: %w[sinatra/lib/sinatra/middleware sinatra/lib/sinatra/version.rb sinatra/lib/sinatra/show_exceptions.rb sinatra/lib/sinatra/indifferent_hash.rb],
+      min_level: 3,
       max_level: 3,  # L4+ has class/method renaming issues with sinatra
     },
     rubocop: {
@@ -138,13 +81,15 @@ class TestGemMinification < Minitest::Test
       copy_files: %w[rubocop/lib/rubocop/cop/internal_affairs rubocop/lib/rubocop/cop/internal_affairs.rb rubocop/lib/rubocop/server.rb rubocop/lib/rubocop/server rubocop/lib/rubocop/rspec],
       file_depth: 2,
       project_files: %w[rubocop/config],
+      min_level: 3,
       max_level: 3  # L4+ constant aliasing breaks rubocop's cop registry
     }
   }.freeze
 
   GEMS.each do |gem_name, config|
+    min_level = config[:min_level] || 0
     max_level = config[:max_level] || 5
-    (0..max_level).each do |level|
+    (min_level..max_level).each do |level|
       define_method(:"test_#{gem_name}_level#{level}") do
         source_path = File.join(GEM_TESTS_DIR, config[:source])
         test_files = Array(config[:test_files] || config[:test_file]).map { |f| File.join(GEM_TESTS_DIR, f) }

@@ -93,8 +93,7 @@ module RubyMinify
     AnalysisResult = Data.define(
       :prism_ast,                  # Prism::ProgramNode for rebuild
       :scope_mappings,             # Hash: cref_id -> variable mapping
-      :constant_mapping,           # ConstantRenameMapping (frozen)
-      :external_prefix_aliaser,    # ExternalPrefixAliaser (frozen)
+      :constant_mapping,           # ConstantRenameMapping (frozen, includes external prefixes)
       :rename_map,                 # Hash<location_key, String>: method short names + attr coordinate adjustments
       :method_alias_map,           # Hash<location_key, Symbol>: method alias replacements
       :method_transform_map,       # Hash<location_key, String>: structural transforms (e.g. .first → [0])

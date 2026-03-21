@@ -14,12 +14,10 @@ module RubyMinify
       end
 
       def self.postprocess(result, analysis, aliases_str, preamble_str)
-        if analysis.external_prefix_aliaser
-          prefix_decls = analysis.external_prefix_aliaser.generate_prefix_declarations
-          preamble_str = [preamble_str, prefix_decls.join(';')].reject(&:empty?).join(';') if prefix_decls.any?
-        end
-
         if analysis.constant_mapping
+          prefix_decls = analysis.constant_mapping.generate_prefix_declarations
+          preamble_str = [preamble_str, prefix_decls.join(';')].reject(&:empty?).join(';') if prefix_decls.any?
+
           alias_decls = analysis.constant_mapping.generate_alias_declarations
           aliases_str = [aliases_str, alias_decls.join(';')].reject(&:empty?).join(';') if alias_decls.any?
         end
@@ -62,7 +60,7 @@ module RubyMinify
         key = prism_location_key(node)
         resolved_cpath = analysis.const_resolution_map[key]
         full_path = analysis.const_full_path_map[key]
-        prefix_alias = full_path && analysis.external_prefix_aliaser&.short_name_for_prefix(full_path)
+        prefix_alias = full_path && analysis.constant_mapping&.short_name_for_prefix(full_path)
 
         if resolved_cpath && analysis.constant_mapping&.user_defined_path?(resolved_cpath)
           short = if node.is_a?(Prism::ConstantReadNode)

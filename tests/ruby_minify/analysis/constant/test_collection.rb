@@ -24,21 +24,21 @@ class TestConstantCollection < Minitest::Test
 
   L2_GROUP_EXPECTED =
     'class Cc1;A=42;def m =A;end;puts Cc1.new.m;' \
-    'module Cc2;module Cc3;H=1;end;end;puts Cc2::Cc3::H;' \
+    'module Cc2;module Cc3;E=1;end;end;puts Cc2::Cc3::E;' \
     'module Cc4;module Cc5;Cc4::Cc5::C=42;end;end;puts Cc4::Cc5::C;' \
     'class Cc6;I=99;def m =Cc6::I;end;puts Cc6.new.m;' \
     'D=42;puts D;' \
     'class Cc7;VAL=1;private_constant :VAL;def m =VAL;end;puts Cc7.new.m;' \
-    'class Cc8;G=1;end;class Cc9<Cc8;def m =G;end;puts Cc9.new.m;' \
+    'class Cc8;F=1;end;class Cc9<Cc8;def m =F;end;puts Cc9.new.m;' \
     'module Cc10;class Cc11;end;end;class Cc12<Cc10::Cc11;def m =1;end;puts Cc12.new.m;' \
     'class Cc13<StandardError;def m =1;end;puts Cc13.new.m;' \
-    'class Cc14;F=42;def m =Cc14::F;end;puts Cc14.new.m;' \
-    'class Cc15;E=1;def m =E;end;puts Cc15.new.m;puts ARGV.size;' \
+    'class Cc14;G=42;def m =Cc14::G;end;puts Cc14.new.m;' \
+    'class Cc15;H=1;def m =H;end;puts Cc15.new.m;puts ARGV.size;' \
     'class Cc16;B=1;def m1 =B;def m2 =B;def m3 =B;end;puts Cc16.new.m1;puts Cc16.new.m2;puts Cc16.new.m3'
 
   L2_GROUP_ALIASES_EXPECTED =
-    'MYVAL=D;Cc1::MY_CONST=Cc1::A;Cc14::VAL=Cc14::F;Cc15::VAL=Cc15::E;' \
-    'Cc16::VAL=Cc16::B;Cc6::BAR=Cc6::I;Cc8::VAL=Cc8::G;Cc2::Cc3::VAL=Cc2::Cc3::H;Cc4::Cc5::VAL=Cc4::Cc5::C'
+    'MYVAL=D;Cc1::MY_CONST=Cc1::A;Cc14::VAL=Cc14::G;Cc15::VAL=Cc15::H;' \
+    'Cc16::VAL=Cc16::B;Cc6::BAR=Cc6::I;Cc8::VAL=Cc8::F;Cc2::Cc3::VAL=Cc2::Cc3::E;Cc4::Cc5::VAL=Cc4::Cc5::C'
 
   def l2_group
     @l2_group ||= minify_at_level(L2_GROUP_CODE, 2)
