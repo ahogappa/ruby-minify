@@ -10,6 +10,9 @@ PATH
   remote: .
   specs:
     ruby-minify (0.2.0)
+      prism (>= 1.4.0)
+      rubocop
+      typeprof (>= 0.31.0)
 
 GEM
   remote: https://rubygems.org/
@@ -105,9 +108,7 @@ PLATFORMS
 DEPENDENCIES
   debug
   minitest
-  prism
   rake (~> 13.0)
-  rubocop
   ruby-minify!
   simplecov
   typeprof!

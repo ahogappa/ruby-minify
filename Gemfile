@@ -9,10 +9,6 @@ gem "rake", "~> 13.0"
 
 gem 'typeprof', github: 'ruby/typeprof'
 
-gem 'prism'
-
-gem 'rubocop'
-
 group :development, :test do
   gem 'debug'
   gem 'minitest'
