@@ -13,10 +13,9 @@ gem 'prism'
 
 gem 'rubocop'
 
-gem 'steep', github: 'soutaro/steep'
-
 group :development, :test do
   gem 'debug'
   gem 'minitest'
   gem 'simplecov', require: false
+  gem 'steep', github: 'soutaro/steep'
 end
