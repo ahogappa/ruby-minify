@@ -267,17 +267,8 @@ module RubyMinify
         type, abs_path = result
         return nil unless type == :rb
         return nil unless @project_root && abs_path.start_with?(@project_root)
-        return nil if gem_installed_path?(abs_path)
 
         abs_path
-      end
-
-      def gem_installed_path?(abs_path)
-        gem_paths.any? { |dir| abs_path.start_with?("#{dir}/") }
-      end
-
-      def gem_paths
-        @gem_paths ||= Gem.path
       end
     end
   end
