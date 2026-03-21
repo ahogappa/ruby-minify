@@ -48,7 +48,6 @@ module TypeProf
     end
 
     class LocalEnv
-      attr_reader path: String?
       attr_reader cref: CRef
       attr_reader locals: Hash[Symbol, BasicVertex]
     end

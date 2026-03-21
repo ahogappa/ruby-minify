@@ -21,7 +21,7 @@ module TypeProf
         attr_reader block_pass: Node?
         attr_reader safe_navigation: bool
 
-        def keyword_args: () -> Array[Node]?
+        attr_reader keyword_args: Array[Node]?
       end
 
       class CallNode < CallBaseNode
@@ -257,6 +257,35 @@ module TypeProf
 
       class UndefNode < Node
         attr_reader names: Array[Symbol]
+      end
+
+      class LambdaNode < Node
+      end
+
+      class ForNode < Node
+        attr_reader body: Node?
+      end
+
+      class DefinedNode < Node
+      end
+
+      class GlobalVariableReadNode < Node
+        attr_reader var: Symbol
+      end
+
+      class GlobalVariableWriteNode < Node
+        attr_reader var: Symbol
+      end
+
+      class AliasGlobalVariableNode < Node
+      end
+
+      class ClassVariableReadNode < Node
+        attr_reader var: Symbol
+      end
+
+      class ClassVariableWriteNode < Node
+        attr_reader var: Symbol
       end
     end
   end
