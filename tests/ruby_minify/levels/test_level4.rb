@@ -15,10 +15,10 @@ class TestLevel4 < Minitest::Test
       "def self.double_value(a) =a*C*S;",
       "def self.clamp_value(a,b,c) =a<b ? b : a>c ? c : a;",
       "end;",
-      "class H;",
+      "class I;",
       "def parent_info =\"base\";",
       "end;",
-      "class A<H;E=256;G=%w[low medium high].freeze;F=%i[add subtract multiply].freeze;",
+      "class A<I;E=256;H=%w[low medium high].freeze;G=%i[add subtract multiply].freeze;",
       "attr_reader :current_value;",
       "attr_accessor :label;",
       "def initialize(b,a:\"default\") =(@current_value=b;@label=a;@a=[];@@a||=0;@@a+=1;$a=self);",
@@ -133,15 +133,15 @@ class TestLevel4 < Minitest::Test
       "puts b.format_flag(!1);",
       "c=B.double_value A::E;",
       "puts c;",
+      "puts A::H.inspect;",
       "puts A::G.inspect;",
-      "puts A::F.inspect;",
-      "puts J::Status.name;",
-      "puts J::Sys.name;",
-      "puts J::UID.name;",
-      "puts J::GID.name"
+      "puts F::Status.name;",
+      "puts F::Sys.name;",
+      "puts F::UID.name;",
+      "puts F::GID.name"
     ].join('')
     assert_equal expected, result.code
-    assert_equal 'J=Process', result.preamble
-    assert_equal 'Base=H;Calculator=A;Formatter=D;MathUtils=B;A::LABELS=A::G;A::OFFSET=A::E;A::SYMBOLS=A::F;B::MULTIPLIER=B::C', result.aliases
+    assert_equal 'F=Process', result.preamble
+    assert_equal 'Base=I;Calculator=A;Formatter=D;MathUtils=B;A::LABELS=A::H;A::OFFSET=A::E;A::SYMBOLS=A::G;B::MULTIPLIER=B::C', result.aliases
   end
 end

@@ -210,4 +210,76 @@ class TestConstantRenameMapping < Minitest::Test
     assert_nil @mapping.short_name_for_path([:MyClass])
     assert_equal "a", @mapping.short_name_for_path([:MY_CONST])
   end
+
+  # === External prefix support ===
+
+  def test_add_external_prefix
+    @mapping.add_external_prefix([:TypeProf, :Core, :AST], usage_count: 20)
+    # External prefixes should NOT be user-defined
+    refute @mapping.user_defined_path?([:TypeProf, :Core, :AST])
+  end
+
+  def test_short_name_for_prefix_after_assign
+    @mapping.add_external_prefix([:TypeProf, :Core, :AST], usage_count: 20)
+    @mapping.assign_short_names(RubyMinify::NameGenerator.new)
+    short = @mapping.short_name_for_prefix([:TypeProf, :Core, :AST, :CallNode])
+    assert_equal "a", short
+  end
+
+  def test_short_name_for_prefix_nil_and_short_paths
+    @mapping.assign_short_names(RubyMinify::NameGenerator.new)
+    assert_nil @mapping.short_name_for_prefix(nil)
+    assert_nil @mapping.short_name_for_prefix([:Foo])
+    assert_nil @mapping.short_name_for_prefix([:Foo, :Bar])
+  end
+
+  def test_generate_prefix_declarations
+    @mapping.add_external_prefix([:TypeProf, :Core, :AST], usage_count: 20)
+    @mapping.assign_short_names(RubyMinify::NameGenerator.new)
+    decls = @mapping.generate_prefix_declarations
+    assert_equal ["a=TypeProf::Core::AST"], decls
+  end
+
+  def test_chained_prefix_declarations
+    @mapping.add_external_prefix([:TypeProf, :Core], usage_count: 20)
+    @mapping.add_external_prefix([:TypeProf, :Core, :AST], usage_count: 20)
+    @mapping.assign_short_names(RubyMinify::NameGenerator.new)
+    decls = @mapping.generate_prefix_declarations
+    assert_equal ["b=TypeProf::Core", "a=b::AST"], decls
+  end
+
+  def test_external_prefix_below_threshold_not_aliased
+    @mapping.add_external_prefix([:A, :B], usage_count: 2)
+    @mapping.assign_short_names(RubyMinify::NameGenerator.new)
+    assert_nil @mapping.short_name_for_prefix([:A, :B, :C])
+  end
+
+  def test_unified_allocation_internal_and_external
+    # Internal constant and external prefix share the same NameGenerator
+    @mapping.add_definition_with_path([:VERY_LONG_CONSTANT_NAME], definition_type: :value)
+    5.times { @mapping.increment_usage_by_path([:VERY_LONG_CONSTANT_NAME]) }
+    @mapping.add_external_prefix([:TypeProf, :Core, :AST], usage_count: 20)
+    @mapping.assign_short_names(RubyMinify::NameGenerator.new)
+
+    # Both should get short names from the same generator (no collision)
+    internal_short = @mapping.short_name_for_path([:VERY_LONG_CONSTANT_NAME])
+    external_short = @mapping.short_name_for_prefix([:TypeProf, :Core, :AST, :X])
+    assert internal_short
+    assert external_short
+    refute_equal internal_short, external_short
+  end
+
+  def test_preamble_induced_parent_prefix
+    # Two sibling external prefixes + some code refs to parent
+    @mapping.add_external_prefix([:TypeProf, :Core, :AST], usage_count: 20)
+    @mapping.add_external_prefix([:TypeProf, :Core, :Type], usage_count: 20)
+    @mapping.add_external_prefix([:TypeProf, :Core], usage_count: 3)
+    @mapping.assign_short_names(RubyMinify::NameGenerator.new)
+    decls = @mapping.generate_prefix_declarations
+
+    parent_decl = decls.find { |d| d.include?("TypeProf::Core") && !d.include?("::AST") && !d.include?("::Type") }
+    assert parent_decl, "Should alias TypeProf::Core as parent prefix"
+    assert decls.any? { |d| d.match?(/=\w+::AST$/) }, "AST should chain through parent"
+    assert decls.any? { |d| d.match?(/=\w+::Type$/) }, "Type should chain through parent"
+  end
 end

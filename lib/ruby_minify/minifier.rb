@@ -140,7 +140,7 @@ module RubyMinify
     end
 
     def build_result(rename_result, source)
-      content = build_output(rename_result.code, source.stdlib_requires)
+      content = build_output(rename_result.code, source.stdlib_requires, rename_result.preamble)
       size = content.bytesize
 
       stats = Pipeline::CompressionStats.new(
@@ -158,8 +158,9 @@ module RubyMinify
       )
     end
 
-    def build_output(code, stdlib_requires)
+    def build_output(code, stdlib_requires, preamble = '')
       parts = stdlib_requires.map { |lib| "require \"#{lib}\"" }
+      parts << preamble unless preamble.empty?
       parts << code
       parts.join(';')
     end

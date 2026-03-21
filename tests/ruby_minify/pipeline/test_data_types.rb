@@ -154,7 +154,7 @@ class TestDataTypes < Minitest::Test
   def test_analysis_result_defaults
     ar = RubyMinify::Pipeline::AnalysisResult.new(
       prism_ast: nil, scope_mappings: {}, constant_mapping: nil,
-      external_prefix_aliaser: nil, rename_map: {}, method_alias_map: {},
+      rename_map: {}, method_alias_map: {},
       method_transform_map: {}, source: nil, attr_rename_map: {},
       block_param_names_map: {}, syntax_data: {}, const_resolution_map: {},
       const_full_path_map: {}, const_write_cpath_map: {}, class_cpath_map: {},
