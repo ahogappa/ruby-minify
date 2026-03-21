@@ -10,6 +10,7 @@ module RubyMinify
   class SyntaxError < Error
   end
 
+  def self.location_key: (untyped node) -> [Integer, Integer]
   def location_key: (untyped node) -> [Integer, Integer]
 
   module AstUtils
@@ -18,24 +19,24 @@ module RubyMinify
     COMPARISON_PREV: Array[Integer]
     PIPE_BREAK_BYTES: Array[Integer]
 
-    def self?.unwrap_statements: (Prism::Node? node) -> Prism::Node?
+    def self?.unwrap_statements: (untyped node) -> untyped
     def self?.middle_method?: (Symbol method) -> bool
     def self?.logical_op?: (Prism::Node node) -> bool
-    def self?.has_block?: (Prism::Node node) -> bool
+    def self?.has_block?: (untyped node) -> bool
     def self?.single_statement_body?: (Prism::Node? body) -> bool
     def self?.setter_def_name?: (Symbol | String name) -> bool
-    def self?.simple_negatable?: (Prism::Node node) -> bool
-    def self?.first_arg_starts_with_brace?: (Prism::Node arg) -> bool
-    def self?.first_arg_is_regex?: (Prism::Node arg) -> bool
-    def self?.can_omit_parens?: (Prism::Node node, ?String? method_name) -> bool
-    def self?.ends_with_name_char?: (Prism::Node node) -> bool
-    def self?.ends_with_method_suffix?: (Prism::Node node) -> bool
-    def self?.needs_ternary_q_space?: (Prism::Node node) -> bool
-    def self?.modifier_control_flow?: (Prism::Node node) -> bool
-    def self?.modifier_conditional?: (Prism::Node node) -> bool
-    def self?.modifier_loop?: (Prism::Node node) -> bool
-    def self?.ternary_needs_parens?: (Prism::Node node, String source) -> bool
-    def self?.contains_bare_block?: (Prism::Node node) -> bool
+    def self?.simple_negatable?: (untyped? node) -> bool
+    def self?.first_arg_starts_with_brace?: (untyped arg) -> bool
+    def self?.first_arg_is_regex?: (untyped arg) -> bool
+    def self?.can_omit_parens?: (untyped node, ?String? method_name) -> bool
+    def self?.ends_with_name_char?: (untyped node) -> bool
+    def self?.ends_with_method_suffix?: (untyped node) -> bool
+    def self?.needs_ternary_q_space?: (untyped node) -> bool
+    def self?.modifier_control_flow?: (untyped node) -> boolish
+    def self?.modifier_conditional?: (untyped node) -> boolish
+    def self?.modifier_loop?: (untyped node) -> boolish
+    def self?.ternary_needs_parens?: (untyped node, String source) -> bool
+    def self?.contains_bare_block?: (untyped node) -> bool
   end
 
   DYNAMIC_VARIABLE_METHODS: Array[Symbol]
@@ -50,4 +51,98 @@ module RubyMinify
     def uf_add: (untyped key) -> void
     def uf_remove: (untyped key) -> void
   end
+
+  # --- scope_management.rb ---
+  def build_scope_mappings: (untyped nodes, Hash[Integer, Hash[Symbol, String]] scope_mappings, ?kw_def_map: Hash[Integer, Hash[Symbol, String]]?, ?var_hints_map: Hash[Integer, Hash[Symbol, String]]?) -> void
+  def register_top_level_scope: (untyped nodes, Hash[Integer, Hash[Symbol, String]] scope_mappings) -> void
+  def collect_scope_vars: (untyped node, Hash[Integer, Hash[Symbol, String]] scope_mappings, ?kw_def_map: Hash[Integer, Hash[Symbol, String]]?, ?var_hints_map: Hash[Integer, Hash[Symbol, String]]?) -> void
+  def collect_extra_block_param_names: (untyped prism_params) -> Array[Symbol]
+  def get_body_cref_id: (untyped body) -> Integer?
+  def collect_parent_mangled_names: (untyped body, Hash[Integer, Hash[Symbol, String]] scope_mappings) -> Array[String]
+  def should_use_numbered_params?: (untyped node, Array[String] parent_mangled_names) -> bool
+  def collect_unused_rescue_vars: (untyped body) -> Set[Symbol]
+  def check_dynamic_pattern: (untyped node) -> bool
+  def collect_multi_target_names: (untyped multi_target_node) -> Array[Symbol]
+  def get_mangled_name: (untyped node, Symbol var, Hash[Integer, Hash[Symbol, String]] scope_mappings) -> String
+
+  # --- analysis/method/collection.rb ---
+  def collect_method_definitions: (untyped nodes, untyped genv) -> void
+  def resolve_method_calls: (untyped genv, untyped nodes) -> void
+  def scan_dynamic_method_references: (untyped nodes) -> void
+  def collect_visibility_modifier_methods: (untyped nodes) -> void
+  def collect_alias_undef_methods: (untyped nodes) -> void
+
+  DYNAMIC_DISPATCH_METHODS: Array[Symbol]
+  VISIBILITY_MODIFIERS: Array[Symbol]
+
+  private
+
+  def link_module_function_variant: (untyped genv, Array[Symbol] cpath, bool singleton, Symbol mid, method_key method_key) -> void
+  def resolve_def_receiver_cpath: (untyped receiver, untyped genv) -> Array[Symbol]?
+  def build_cpath_from_prism_node: (untyped node) -> Array[Symbol]?
+  def merge_super_groups: (Array[[method_key, method_key]] super_merges) -> void
+  def merge_polymorphic_groups: (Hash[Integer, Array[method_key]] call_node_to_keys) -> void
+  def merge_unresolved_calls: (untyped nodes, Set[Integer] resolved_call_ids, untyped genv) -> void
+  def classify_unresolved_call: (Symbol mid, untyped node, untyped genv) -> Symbol
+
+  public
+
+  # --- analysis/constant/collection.rb ---
+  def syntax_data: (untyped subnode) -> Hash[Symbol, untyped]
+  def normalize_const_write_cpath: (untyped node) -> Array[Symbol]
+  def resolve_constant_read_cpath: (untyped node) -> Array[Symbol]?
+  def build_constant_path: (untyped node) -> Array[Symbol]?
+  def resolve_constant_path: (untyped const_node, untyped current_scope) -> Array[Symbol]?
+  def exclude_private_constants: (untyped nodes) -> void
+  def collect_constants: (untyped nodes) -> void
+  def count_constant_references: (untyped nodes) -> void
+  def increment_constant_read_usage: (untyped node) -> void
+  def resolve_user_defined_cpath: (untyped node) -> Array[Symbol]?
+  def augment_constant_counts_via_typeprof: (untyped genv) -> void
+  def collect_external_references: (untyped nodes) -> void
+
+  # --- analysis/ivar/collection.rb ---
+  DYNAMIC_IVAR_METHODS: Array[Symbol]
+
+  def collect_ivar_definitions: (untyped nodes, Hash[Array[Symbol], Set[Symbol]] attr_backed) -> void
+  def collect_attr_backed_ivars: (untyped nodes) -> Hash[Array[Symbol], Set[Symbol]]
+  def scan_dynamic_ivar_access: (untyped nodes) -> void
+  def merge_inherited_ivars: (untyped genv) -> void
+  def reserve_attr_ivar_names: (untyped nodes) -> void
+  def coordinate_attr_renames: (untyped nodes, untyped genv, Hash[untyped, String] rename_map, Hash[untyped, String] attr_ivar_entries) -> Hash[untyped, Hash[Symbol, String]]
+
+  # --- analysis/keyword/collection.rb ---
+  def collect_keyword_info: (untyped nodes, untyped genv) -> void
+
+  private
+
+  def collect_keyword_call_sites: (untyped genv, untyped nodes) -> void
+  def exclude_unresolved_keyword_calls: (untyped nodes, untyped genv) -> void
+
+  public
+
+  # --- analysis/cvar/collection.rb ---
+  DYNAMIC_CVAR_METHODS: Array[Symbol]
+
+  def collect_cvar_definitions: (untyped nodes) -> void
+  def scan_dynamic_cvar_access: (untyped nodes) -> void
+  def merge_inherited_cvars: (untyped genv) -> void
+
+  # --- analysis/gvar/collection.rb ---
+  def collect_gvar_definitions: (untyped nodes) -> void
+  def scan_alias_globals: (untyped nodes) -> void
+
+  # --- analysis/method_aliases.rb ---
+  METHOD_ALIASES: Hash[Symbol, Symbol]
+  METHOD_TRANSFORMS: Hash[[Symbol, Symbol], String]
+
+  # --- analysis/method_aliasing.rb ---
+  def resolve_method_aliases_and_transforms: (untyped nodes, untyped genv) -> [Hash[[Integer, Integer], Symbol], Hash[[Integer, Integer], String]]
+
+  private
+
+  def alias_available_on_receiver?: (untyped recv_node, Symbol shorter_method, untyped genv) -> bool
+  def method_available_on_type?: (untyped genv, untyped mod, bool singleton, Symbol method_name) -> bool
+  def receiver_matches_type?: (untyped recv_node, Symbol type_name, untyped genv) -> bool
+  def mod_is_or_inherits?: (untyped genv, untyped mod, untyped target) -> bool
 end

@@ -3,7 +3,7 @@ module RubyMinify
     class UnifiedRenamer
       include RenamePatcher
 
-      def call: (ConcatenatedSource source, Array[[singleton(ConstantAliaser) | singleton(VariableRenamer) | singleton(MethodRenamer)] | [singleton(ConstantAliaser) | singleton(VariableRenamer) | singleton(MethodRenamer), Hash[Symbol, untyped]]] stage_defs) -> RenameResult
+      def call: (ConcatenatedSource source, Array[untyped] stage_defs) -> RenameResult
     end
   end
 end

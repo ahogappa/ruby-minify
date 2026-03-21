@@ -4,6 +4,12 @@ module RubyMinify
       include SourcePatcher
 
       def call: (String input, **untyped) -> String
+
+      private
+
+      def walk: (Prism::Node node, String source, Array[Hash[Symbol, untyped]] patches) -> void
+      def try_def: (Prism::DefNode node, String source) -> String?
+      def keyword_logical?: (Prism::Node node, String source) -> bool
     end
   end
 end

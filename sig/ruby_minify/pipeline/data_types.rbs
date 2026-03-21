@@ -8,6 +8,7 @@ module RubyMinify
       attr_reader in_class_dependencies: Array[String]
 
       def self.new: (path: String, content: String, dependencies: Array[String], require_nodes: Array[Hash[Symbol, untyped]], ?in_class_dependencies: Array[String]) -> FileEntry
+      def initialize: (path: String, content: String, dependencies: Array[String], require_nodes: Array[Hash[Symbol, untyped]], ?in_class_dependencies: Array[String]) -> void
     end
 
     class DependencyGraph
@@ -40,6 +41,7 @@ module RubyMinify
       attr_reader rbs_files: Hash[String, String]
 
       def self.new: (content: String, file_boundaries: Array[FileBoundary], original_size: Integer, stdlib_requires: Array[String], ?rbs_files: Hash[String, String]) -> ConcatenatedSource
+      def initialize: (content: String, file_boundaries: Array[FileBoundary], original_size: Integer, stdlib_requires: Array[String], ?rbs_files: Hash[String, String]) -> void
     end
 
     type location_key = [Integer, Integer]
@@ -92,6 +94,15 @@ module RubyMinify
         ?cvar_rename_entries: Hash[location_key, String],
         ?gvar_rename_entries: Hash[location_key, String]
       ) -> AnalysisResult
+      def initialize: (
+        ?local_rename_entries: Hash[location_key, String],
+        ?keyword_rename_entries: Hash[location_key, String],
+        ?ivar_rename_entries: Hash[location_key, String],
+        ?attr_ivar_entries: Hash[location_key, String],
+        ?cvar_rename_entries: Hash[location_key, String],
+        ?gvar_rename_entries: Hash[location_key, String],
+        **untyped
+      ) -> void
     end
 
     class CompressionStats
@@ -109,6 +120,7 @@ module RubyMinify
       attr_reader preamble: String
 
       def self.new: (code: String, ?aliases: String, ?preamble: String) -> RenameResult
+      def initialize: (code: String, ?aliases: String, ?preamble: String) -> void
     end
 
     class MinifiedResult
@@ -118,6 +130,7 @@ module RubyMinify
       attr_reader stats: CompressionStats
 
       def self.new: (content: String, ?aliases: String, ?preamble: String, stats: CompressionStats) -> MinifiedResult
+      def initialize: (content: String, ?aliases: String, ?preamble: String, stats: CompressionStats) -> void
     end
   end
 end

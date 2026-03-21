@@ -1,7 +1,7 @@
 module RubyMinify
   EXCLUDED_METHODS: Set[Symbol]
 
-  type method_key = [Array[Symbol], bool, Symbol]
+  type method_key = Array[untyped]
 
   class MethodRenameMapping
     include UnionFind
@@ -16,7 +16,7 @@ module RubyMinify
 
     @methods: Hash[method_key, { def_nodes: Array[untyped], call_sites: Array[untyped] }]
     @node_to_key: Hash[Integer, method_key]
-    @node_short_names: Hash[[Integer, Integer], String]
+    @node_short_names: Hash[untyped, String]
     @key_short_names: Hash[method_key, String]
     @implicit_receiver_sites: Hash[Integer, Integer]
     @frozen: bool
@@ -29,19 +29,19 @@ module RubyMinify
 
     def add_call_site: (untyped call_node, method_key method_key, has_receiver: bool) -> void
 
-    def exclude_methods_by_mid: (Set[Symbol] mids) -> void
+    def exclude_methods_by_mid: (untyped mids) -> void
 
     def merge_all_by_mid: (Symbol mid) -> void
 
     def add_unresolved_sites_for_mid: (Symbol mid, Array[untyped] call_nodes) -> void
 
-    def assign_short_names: (Hash[Integer, Hash[untyped, String]] scope_mappings, ?untyped? genv) -> void
+    def assign_short_names: (untyped scope_mappings, ?untyped? genv) -> void
 
-    def short_name_for: ([Integer, Integer] node_location_key) -> String?
+    def short_name_for: (untyped node_location_key) -> String?
 
     def short_name_for_key: (method_key method_key) -> String?
 
-    def node_mapping: () -> Hash[[Integer, Integer], String]
+    def node_mapping: () -> Hash[untyped, String]
 
     def each_method_key: () { (method_key) -> void } -> void
 
@@ -51,15 +51,15 @@ module RubyMinify
 
     private
 
-    def build_group_entries: (Hash[method_key, Array[method_key]] groups) -> Array[MethodGroupEntry]
+    def build_group_entries: (Hash[untyped, Array[method_key]] groups) -> Array[MethodGroupEntry]
 
-    def build_scope_vars: (Hash[Integer, Hash[untyped, String]] scope_mappings) -> Hash[Integer, Set[String]]
+    def build_scope_vars: (untyped scope_mappings) -> Hash[Integer, Set[String]]
 
-    def build_existing_method_names: (untyped genv) -> [Hash[[Array[Symbol], bool], Set[String]], Hash[Symbol, untyped]]
+    def build_existing_method_names: (untyped genv) -> [Hash[untyped, Set[String]], Hash[Symbol, untyped]]
 
-    def find_shortest_name: (Array[method_key] keys, Hash[Integer, Set[String]] scope_vars, Hash[[Array[Symbol], bool], Set[String]] existing_methods) -> String
+    def find_shortest_name: (Array[method_key] keys, Hash[Integer, Set[String]] scope_vars, Hash[untyped, Set[String]] existing_methods) -> String
 
-    def propagate_short_name: (Array[method_key] keys, String short_name, Hash[[Array[Symbol], bool], Set[String]] existing_methods, Hash[Symbol, untyped] hierarchy) -> void
+    def propagate_short_name: (Array[method_key] keys, String short_name, Hash[untyped, Set[String]] existing_methods, Hash[Symbol, untyped] hierarchy) -> void
 
     def assign_short_name: (Array[method_key] keys, String short_name) -> void
   end

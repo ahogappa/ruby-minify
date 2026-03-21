@@ -7,6 +7,13 @@ module RubyMinify
       INTEGER_ONLY_OPS: Array[Symbol]
 
       def call: (String input, **untyped) -> String
+
+      private
+
+      def walk: (Prism::Node node, Array[Hash[Symbol, untyped]] patches) -> void
+      def try_constant_fold: (Prism::Node node) -> Numeric?
+      def try_fold_binary_op: (Prism::CallNode node) -> Numeric?
+      def apply_op: (untyped lhs, Symbol op, untyped rhs) -> Numeric?
     end
   end
 end

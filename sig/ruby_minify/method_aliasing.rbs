@@ -1,10 +1,1 @@
-module RubyMinify
-  def resolve_method_aliases_and_transforms: (untyped nodes, untyped genv) -> [Hash[Pipeline::location_key, Symbol], Hash[Pipeline::location_key, String]]
-
-  private
-
-  def alias_available_on_receiver?: (untyped recv_node, Symbol shorter_method, untyped genv) -> bool
-  def method_available_on_type?: (untyped genv, untyped mod, bool singleton, Symbol method_name) -> bool
-  def receiver_matches_type?: (untyped recv_node, Symbol type_name, untyped genv) -> bool
-  def mod_is_or_inherits?: (untyped genv, untyped mod, untyped target) -> bool
-end
+# Method aliasing declarations are in sig/ruby_minify.rbs

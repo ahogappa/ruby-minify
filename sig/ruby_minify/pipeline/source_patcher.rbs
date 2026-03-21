@@ -5,7 +5,7 @@ module RubyMinify
 
       def mk: (untyped node, String replacement) -> Hash[Symbol, untyped]
       def apply_patches: (String source, Array[Hash[Symbol, untyped]] patches) -> String
-      def src: (String source, untyped node) -> String
+      def src: (String source, untyped node) -> untyped
     end
   end
 end

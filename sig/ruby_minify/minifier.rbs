@@ -21,6 +21,6 @@ module RubyMinify
 
     def run_pipeline: (Pipeline::ConcatenatedSource source, Integer target_level) -> Pipeline::RenameResult
     def build_result: (Pipeline::RenameResult rename_result, Pipeline::ConcatenatedSource source) -> Pipeline::MinifiedResult
-    def build_output: (String code, Array[String] stdlib_requires) -> String
+    def build_output: (String code, Array[String] stdlib_requires, ?String preamble) -> String
   end
 end

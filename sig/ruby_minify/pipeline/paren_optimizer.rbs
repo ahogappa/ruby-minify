@@ -2,6 +2,16 @@ module RubyMinify
   module Pipeline
     class ParenOptimizer
       def call: (String input_string, ?analysis: AnalysisResult?) -> String
+
+      private
+
+      def walk: (Prism::Node node, String source, Array[Hash[Symbol, untyped]] patches, statement_level: bool) -> void
+      def walk_if: (Prism::IfNode node, String source, Array[Hash[Symbol, untyped]] patches) -> void
+      def walk_call_children: (Prism::CallNode node, String source, Array[Hash[Symbol, untyped]] patches) -> void
+      def try_remove_call_parens: (Prism::CallNode node, String source, Array[Hash[Symbol, untyped]] patches) -> void
+      def try_remove_yield_parens: (Prism::YieldNode node, Array[Hash[Symbol, untyped]] patches) -> void
+      def add_paren_removal_patches: (Prism::Location open_loc, Prism::Location close_loc, Array[Hash[Symbol, untyped]] patches) -> void
+      def apply_patches: (String source, Array[Hash[Symbol, untyped]] patches) -> String
     end
   end
 end
