@@ -16,7 +16,7 @@ module RubyMinify
       def build_ternary: (Prism::Node cond_node, String cond, Prism::Node? then_node, String? then_expr, String? else_expr) -> String
       def try_unless: (Prism::UnlessNode node, String source) -> String?
       def try_while: (Prism::WhileNode node, String source) -> String?
-      def too_complex_for_ternary?: (String? text) -> untyped
+      def too_complex_for_ternary?: (String? text) -> bool
       def try_until: (Prism::UntilNode node, String source) -> String?
       def in_collection_context?: (Prism::Node node, String source) -> bool
       def condition_assigns_var_used_in_body?: (Prism::Node predicate, Prism::Node? body) -> bool

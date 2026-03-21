@@ -3,7 +3,6 @@ module RubyMinify
     class ConstantAliaser
       include RenamePatcher
 
-      def call: (String input_string, ?analysis: AnalysisResult?, ?prism_result: untyped?, ?source: ConcatenatedSource?) -> RenameResult
       def self.collect_patches_from: (Prism::ProgramNode prism_ast, Array[Hash[Symbol, untyped]] patches, AnalysisResult analysis, ?untyped? kwargs) -> void
       def self.postprocess: (String result, AnalysisResult analysis, String aliases_str, String preamble_str) -> [String, String, String]
       def run_collect: (Prism::ProgramNode node, Array[Hash[Symbol, untyped]] patches, AnalysisResult analysis, Set[Integer] class_module_cpath_offsets) -> void

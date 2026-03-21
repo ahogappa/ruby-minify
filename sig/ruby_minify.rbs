@@ -13,32 +13,6 @@ module RubyMinify
   def self.location_key: (untyped node) -> [Integer, Integer]
   def location_key: (untyped node) -> [Integer, Integer]
 
-  module AstUtils
-    MIDDLE_METHODS: Array[Symbol]
-    TERNARY_SAFE_PREV: Array[Integer]
-    COMPARISON_PREV: Array[Integer]
-    PIPE_BREAK_BYTES: Array[Integer]
-
-    def self?.unwrap_statements: (untyped node) -> untyped
-    def self?.middle_method?: (Symbol method) -> bool
-    def self?.logical_op?: (Prism::Node node) -> bool
-    def self?.has_block?: (untyped node) -> bool
-    def self?.single_statement_body?: (Prism::Node? body) -> bool
-    def self?.setter_def_name?: (Symbol | String name) -> bool
-    def self?.simple_negatable?: (untyped? node) -> bool
-    def self?.first_arg_starts_with_brace?: (untyped arg) -> bool
-    def self?.first_arg_is_regex?: (untyped arg) -> bool
-    def self?.can_omit_parens?: (untyped node, ?String? method_name) -> bool
-    def self?.ends_with_name_char?: (untyped node) -> bool
-    def self?.ends_with_method_suffix?: (untyped node) -> bool
-    def self?.needs_ternary_q_space?: (untyped node) -> bool
-    def self?.modifier_control_flow?: (untyped node) -> boolish
-    def self?.modifier_conditional?: (untyped node) -> boolish
-    def self?.modifier_loop?: (untyped node) -> boolish
-    def self?.ternary_needs_parens?: (untyped node, String source) -> bool
-    def self?.contains_bare_block?: (untyped node) -> bool
-  end
-
   DYNAMIC_VARIABLE_METHODS: Array[Symbol]
 
   module UnionFind

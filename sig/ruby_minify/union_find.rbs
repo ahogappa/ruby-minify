@@ -1,0 +1,15 @@
+module RubyMinify
+  module UnionFind
+    @parent: Hash[untyped, untyped]
+    @rank: Hash[untyped, Integer]
+
+    def uf_init: () -> void
+    def uf_root: (untyped key) -> untyped
+    def merge_groups: (untyped key1, untyped key2) -> void
+
+    private
+
+    def uf_add: (untyped key) -> untyped
+    def uf_remove: (untyped key) -> void
+  end
+end
