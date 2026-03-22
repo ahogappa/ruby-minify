@@ -5,7 +5,7 @@ module RubyMinify
     class BooleanShorten
       include SourcePatcher
 
-      def call(input, **)
+      def call(input)
         ast = Prism.parse(input).value
         patches = []
         walk(ast, patches)

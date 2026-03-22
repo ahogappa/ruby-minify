@@ -6,7 +6,7 @@ module RubyMinify
       COLLECTION_CONTEXT_BYTES: Array[Integer]
       OPERATOR_START_BYTES: Array[Integer]
 
-      def call: (String input, **untyped) -> String
+      def call: (String input) -> String
 
       private
 

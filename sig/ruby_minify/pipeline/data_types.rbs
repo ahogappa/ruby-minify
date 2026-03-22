@@ -54,13 +54,13 @@ module RubyMinify
       attr_reader source: ConcatenatedSource
       attr_reader attr_rename_map: Hash[location_key, Hash[Symbol, String]]
       attr_reader block_param_names_map: Hash[location_key, Hash[Symbol, String]]
-      attr_reader syntax_data: Hash[[Integer, Integer], Hash[Symbol, untyped]]
+      attr_reader syntax_data: Hash[[Integer, Integer], Hash[Symbol, syntax_value]]
       attr_reader const_resolution_map: Hash[location_key, Array[Symbol]]
       attr_reader const_full_path_map: Hash[location_key, Array[Symbol]]
       attr_reader const_write_cpath_map: Hash[location_key, Array[Symbol]]
       attr_reader class_cpath_map: Hash[location_key, Array[Symbol]]
       attr_reader superclass_resolution_map: Hash[location_key, Array[Symbol]]
-      attr_reader meta_node_map: Hash[location_key, Hash[Symbol, untyped]]
+      attr_reader meta_node_map: Hash[location_key, Hash[Symbol, syntax_value]]
       attr_reader local_rename_entries: Hash[location_key, String]
       attr_reader keyword_rename_entries: Hash[location_key, String]
       attr_reader ivar_rename_entries: Hash[location_key, String]
@@ -78,13 +78,13 @@ module RubyMinify
         source: ConcatenatedSource,
         attr_rename_map: Hash[location_key, Hash[Symbol, String]],
         block_param_names_map: Hash[location_key, Hash[Symbol, String]],
-        syntax_data: Hash[[Integer, Integer], Hash[Symbol, untyped]],
+        syntax_data: Hash[[Integer, Integer], Hash[Symbol, syntax_value]],
         const_resolution_map: Hash[location_key, Array[Symbol]],
         const_full_path_map: Hash[location_key, Array[Symbol]],
         const_write_cpath_map: Hash[location_key, Array[Symbol]],
         class_cpath_map: Hash[location_key, Array[Symbol]],
         superclass_resolution_map: Hash[location_key, Array[Symbol]],
-        meta_node_map: Hash[location_key, Hash[Symbol, untyped]],
+        meta_node_map: Hash[location_key, Hash[Symbol, syntax_value]],
         ?local_rename_entries: Hash[location_key, String],
         ?keyword_rename_entries: Hash[location_key, String],
         ?ivar_rename_entries: Hash[location_key, String],
@@ -102,13 +102,13 @@ module RubyMinify
         source: ConcatenatedSource,
         attr_rename_map: Hash[location_key, Hash[Symbol, String]],
         block_param_names_map: Hash[location_key, Hash[Symbol, String]],
-        syntax_data: Hash[[Integer, Integer], Hash[Symbol, untyped]],
+        syntax_data: Hash[[Integer, Integer], Hash[Symbol, syntax_value]],
         const_resolution_map: Hash[location_key, Array[Symbol]],
         const_full_path_map: Hash[location_key, Array[Symbol]],
         const_write_cpath_map: Hash[location_key, Array[Symbol]],
         class_cpath_map: Hash[location_key, Array[Symbol]],
         superclass_resolution_map: Hash[location_key, Array[Symbol]],
-        meta_node_map: Hash[location_key, Hash[Symbol, untyped]],
+        meta_node_map: Hash[location_key, Hash[Symbol, syntax_value]],
         ?local_rename_entries: Hash[location_key, String],
         ?keyword_rename_entries: Hash[location_key, String],
         ?ivar_rename_entries: Hash[location_key, String],

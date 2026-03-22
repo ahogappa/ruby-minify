@@ -12,7 +12,7 @@ module TypeProf
   module Core
     class Service
       attr_reader genv: GlobalEnv
-      def initialize: (Hash[Symbol, untyped] options) -> void
+      def initialize: (Hash[Symbol, bool | String] options) -> void
       def update_rb_file: (String path, String? code) -> void
       def update_rbs_file: (String path, String? code) -> void
     end

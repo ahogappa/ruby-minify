@@ -3,7 +3,7 @@ module RubyMinify
     class CharShorten
       include SourcePatcher
 
-      def call: (String input, **untyped) -> String
+      def call: (String input) -> String
 
       private
 

@@ -5,7 +5,7 @@ module RubyMinify
     class EndlessMethod
       include SourcePatcher
 
-      def call(input, **)
+      def call(input)
         source = input
         loop do
           ast = Prism.parse(source).value
