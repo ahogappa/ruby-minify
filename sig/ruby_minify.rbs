@@ -18,17 +18,6 @@ module RubyMinify
 
   DYNAMIC_VARIABLE_METHODS: Array[Symbol]
 
-  module UnionFind
-    def uf_init: () -> void
-    def uf_root: (method_key key) -> method_key
-    def merge_groups: (method_key key1, method_key key2) -> void
-
-    private
-
-    def uf_add: (method_key key) -> void
-    def uf_remove: (method_key key) -> void
-  end
-
   # --- scope_management.rb ---
   def build_scope_mappings: (tp_node nodes, Hash[Integer, Hash[Symbol, String]] scope_mappings, ?kw_def_map: Hash[Integer, Hash[Symbol, String]]?, ?var_hints_map: Hash[Integer, Hash[Symbol, String]]?) -> void
   def register_top_level_scope: (tp_node nodes, Hash[Integer, Hash[Symbol, String]] scope_mappings) -> void
