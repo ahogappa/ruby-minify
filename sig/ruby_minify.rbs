@@ -12,9 +12,10 @@ module RubyMinify
 
   type tp_node = TypeProf::Core::AST::Node
   type tp_genv = TypeProf::Core::GlobalEnv
+  type location_key = [Integer, Integer]
 
-  def self.location_key: (Prism::Node | tp_node node) -> [Integer, Integer]
-  def location_key: (Prism::Node | tp_node node) -> [Integer, Integer]
+  def self.location_key: (Prism::Node | tp_node node) -> location_key
+  def location_key: (Prism::Node | tp_node node) -> location_key
 
   DYNAMIC_VARIABLE_METHODS: Array[Symbol]
 

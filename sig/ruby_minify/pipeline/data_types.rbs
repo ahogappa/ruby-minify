@@ -44,8 +44,6 @@ module RubyMinify
       def initialize: (content: String, file_boundaries: Array[FileBoundary], original_size: Integer, stdlib_requires: Array[String], ?rbs_files: Hash[String, String]) -> void
     end
 
-    type location_key = [Integer, Integer]
-
     class AnalysisResult
       attr_reader prism_ast: Prism::ProgramNode
       attr_reader scope_mappings: Hash[Integer, Hash[Symbol, String]]
