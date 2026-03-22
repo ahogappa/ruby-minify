@@ -1,6 +1,6 @@
 module RubyMinify
   module Pipeline
-    type require_node_info = Hash[Symbol, untyped]
+    type require_node_info = { type: Symbol, path: String, line: Integer, start_offset: Integer, length: Integer, in_class: bool }
 
     class FileCollector < Stage
       def call: (String | Array[String] entry_path) -> DependencyGraph
