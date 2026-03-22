@@ -1,7 +1,7 @@
 module RubyMinify
   EXCLUDED_METHODS: Set[Symbol]
 
-  type method_key = Array[untyped]
+  type method_key = [Array[Symbol], bool, Symbol]
 
   class MethodRenameMapping
     include UnionFind
