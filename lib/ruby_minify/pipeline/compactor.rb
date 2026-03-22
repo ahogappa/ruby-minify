@@ -30,7 +30,7 @@ module RubyMinify
         Prism::IndexOperatorWriteNode, Prism::IndexOrWriteNode, Prism::IndexAndWriteNode,
       ].freeze
 
-      def call(input_string, **)
+      def call(input_string)
         @prism_ast = Prism.parse(input_string).value
         @inside_singleton_class = false
         rebuild.join(";")

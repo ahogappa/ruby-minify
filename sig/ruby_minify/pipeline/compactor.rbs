@@ -8,7 +8,7 @@ module RubyMinify
       MODIFIER_KEYWORD_NODES: Array[singleton(Prism::Node)]
       ASSIGNMENT_NODES: Array[singleton(Prism::Node)]
 
-      def call: (String input_string, **untyped) -> String
+      def call: (String input_string) -> String
 
       private
 

@@ -4,7 +4,7 @@ module RubyMinify
       include RubyMinify
 
       def call: (ConcatenatedSource source) -> AnalysisResult
-      def syntax_data_for: (Prism::ProgramNode prism_ast) -> Hash[Array[Integer], Hash[Symbol, untyped]]
+      def syntax_data_for: (Prism::ProgramNode prism_ast) -> Hash[Array[Integer], Hash[Symbol, syntax_value]]
       def self.prism_only: (ConcatenatedSource source) -> AnalysisResult
       def self.prism_only_from_string: (String content, ?source: ConcatenatedSource?) -> AnalysisResult
 
@@ -28,9 +28,9 @@ module RubyMinify
       def augment_for_index: (TypeProf::Core::AST::Node nodes, Hash[Integer, Hash[Symbol, String]] scope_mappings, Symbol syntax_key) -> void
       def precompute_constant_resolution: (TypeProf::Core::AST::Node nodes) -> void
       def precompute_meta_nodes: (TypeProf::Core::AST::Node nodes) -> void
-      def collect_syntax_data: (Prism::ProgramNode prism_ast) -> Hash[Array[Integer], Hash[Symbol, untyped]]
+      def collect_syntax_data: (Prism::ProgramNode prism_ast) -> Hash[Array[Integer], Hash[Symbol, syntax_value]]
       def count_cpath_segments: (Prism::Node node) -> Integer
-      def traverse_prism: (Prism::Node node, Hash[Array[Integer], Hash[Symbol, untyped]] data) -> void
+      def traverse_prism: (Prism::Node node, Hash[Array[Integer], Hash[Symbol, syntax_value]] data) -> void
     end
   end
 end

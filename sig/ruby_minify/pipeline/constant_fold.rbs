@@ -6,7 +6,7 @@ module RubyMinify
       FOLDABLE_OPS: Array[Symbol]
       INTEGER_ONLY_OPS: Array[Symbol]
 
-      def call: (String input, **untyped) -> String
+      def call: (String input) -> String
 
       private
 

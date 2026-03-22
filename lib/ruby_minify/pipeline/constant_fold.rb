@@ -8,7 +8,7 @@ module RubyMinify
       FOLDABLE_OPS = %i[+ - * / % ** << >> & | ^].freeze
       INTEGER_ONLY_OPS = %i[<< >> & | ^].freeze
 
-      def call(input, **)
+      def call(input)
         ast = Prism.parse(input).value
         patches = []
         walk(ast, patches)

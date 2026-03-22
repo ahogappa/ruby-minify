@@ -11,7 +11,7 @@ module RubyMinify
 
       def rubocop_autocorrect: (String source_code) -> String
       def build_processed_source: (String code) -> RuboCop::ProcessedSource
-      def cop_registry: () -> untyped
+      def cop_registry: () -> RuboCop::Cop::Registry
       def rubocop_config: () -> RuboCop::Config
     end
   end
