@@ -48,7 +48,7 @@ module RubyMinify
         savings = (name.to_s.length - short_name.length) * nodes.size
         next unless savings > 0
 
-        nodes.each { |n| @node_short_names[RubyMinify.location_key(n)] = short_name }
+        nodes.each { |n| @node_short_names[AstUtils.location_key(n)] = short_name }
       end
     end
 

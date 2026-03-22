@@ -230,8 +230,8 @@ module RubyMinify
       keys.each do |key|
         @key_short_names[key] = short_name
         data = @methods[key]
-        data[:def_nodes].each { |n| @node_short_names[RubyMinify.location_key(n)] = short_name }
-        data[:call_sites].each { |n| @node_short_names[RubyMinify.location_key(n)] = short_name }
+        data[:def_nodes].each { |n| @node_short_names[AstUtils.location_key(n)] = short_name }
+        data[:call_sites].each { |n| @node_short_names[AstUtils.location_key(n)] = short_name }
       end
     end
 

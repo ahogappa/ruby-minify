@@ -118,7 +118,7 @@ module RubyMinify
           getter_key = [box.cpath, box.singleton, box.mid].freeze
           getter_short = @method_rename_mapping.short_name_for_key(getter_key)
           ivar_key = [box.cpath, :"@#{box.mid}"]
-          info = { box: box, node: node, loc_key: location_key(node), ivar_key: ivar_key }
+          info = { box: box, node: node, loc_key: AstUtils.location_key(node), ivar_key: ivar_key }
           if getter_short
             info[:getter_short] = getter_short
             path_a_info << info
@@ -255,7 +255,7 @@ module RubyMinify
         end
       end
       next unless short
-      nodes_list.each { |n| attr_ivar_entries[location_key(n)] = short }
+      nodes_list.each { |n| attr_ivar_entries[AstUtils.location_key(n)] = short }
     end
 
     # 2c: setter call site renames → rename_map (Path A)
@@ -266,7 +266,7 @@ module RubyMinify
       setter_method = genv.resolve_method(box.cpath, box.singleton, setter_mid) rescue nil
       next unless setter_method
       setter_method.method_call_boxes.each do |cb|
-        rename_map[location_key(cb.node)] = "#{info[:getter_short]}="
+        rename_map[AstUtils.location_key(cb.node)] = "#{info[:getter_short]}="
       end
     end
 
@@ -279,7 +279,7 @@ module RubyMinify
       getter_method = genv.resolve_method(box.cpath, box.singleton, box.mid) rescue nil
       if getter_method
         getter_method.method_call_boxes.each do |cb|
-          rename_map[location_key(cb.node)] = method_short.to_s
+          rename_map[AstUtils.location_key(cb.node)] = method_short.to_s
         end
       end
 
@@ -288,7 +288,7 @@ module RubyMinify
       setter_method = genv.resolve_method(box.cpath, box.singleton, setter_mid) rescue nil
       next unless setter_method
       setter_method.method_call_boxes.each do |cb|
-        rename_map[location_key(cb.node)] = "#{method_short}="
+        rename_map[AstUtils.location_key(cb.node)] = "#{method_short}="
       end
     end
 
