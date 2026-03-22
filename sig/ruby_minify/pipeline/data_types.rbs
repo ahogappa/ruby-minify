@@ -4,11 +4,11 @@ module RubyMinify
       attr_reader path: String
       attr_reader content: String
       attr_reader dependencies: Array[String]
-      attr_reader require_nodes: Array[Hash[Symbol, untyped]]
+      attr_reader require_nodes: Array[require_node_info]
       attr_reader in_class_dependencies: Array[String]
 
-      def self.new: (path: String, content: String, dependencies: Array[String], require_nodes: Array[Hash[Symbol, untyped]], ?in_class_dependencies: Array[String]) -> FileEntry
-      def initialize: (path: String, content: String, dependencies: Array[String], require_nodes: Array[Hash[Symbol, untyped]], ?in_class_dependencies: Array[String]) -> void
+      def self.new: (path: String, content: String, dependencies: Array[String], require_nodes: Array[require_node_info], ?in_class_dependencies: Array[String]) -> FileEntry
+      def initialize: (path: String, content: String, dependencies: Array[String], require_nodes: Array[require_node_info], ?in_class_dependencies: Array[String]) -> void
     end
 
     class DependencyGraph

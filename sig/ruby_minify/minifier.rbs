@@ -3,14 +3,18 @@ module RubyMinify
     DEFAULT_LEVEL: Integer
     LEVEL_ALIASES: Hash[String, Integer]
 
+    type optimizer_class = singleton(Pipeline::BooleanShorten) | singleton(Pipeline::CharShorten) | singleton(Pipeline::ConstantFold) | singleton(Pipeline::ControlFlowSimplify) | singleton(Pipeline::EndlessMethod) | singleton(Pipeline::ParenOptimizer)
+    type renamer_class = singleton(Pipeline::ConstantAliaser) | singleton(Pipeline::VariableRenamer) | singleton(Pipeline::MethodRenamer)
+    type stage_entry = Hash[optimizer_class, Integer] | [renamer_class] | [renamer_class, Hash[Symbol, bool]]
+
     def self.resolve_level: (String value) -> Integer
 
-    OPTIMIZE: Hash[singleton(Pipeline::BooleanShorten) | singleton(Pipeline::CharShorten) | singleton(Pipeline::ConstantFold) | singleton(Pipeline::ControlFlowSimplify) | singleton(Pipeline::EndlessMethod) | singleton(Pipeline::ParenOptimizer), Integer]
+    OPTIMIZE: Hash[optimizer_class, Integer]
     ALL_VAR_FEATURES: Hash[Symbol, Hash[Symbol, bool]]
     ALL_VAR_WITH_ATTR: Hash[Symbol, Hash[Symbol, bool]]
-    STAGES: Hash[Integer, Array[Hash[singleton(Pipeline::BooleanShorten) | singleton(Pipeline::CharShorten) | singleton(Pipeline::ConstantFold) | singleton(Pipeline::ControlFlowSimplify) | singleton(Pipeline::EndlessMethod) | singleton(Pipeline::ParenOptimizer), Integer] | [singleton(Pipeline::ConstantAliaser) | singleton(Pipeline::VariableRenamer) | singleton(Pipeline::MethodRenamer)] | [singleton(Pipeline::ConstantAliaser) | singleton(Pipeline::VariableRenamer) | singleton(Pipeline::MethodRenamer), Hash[Symbol, untyped]]]]
+    STAGES: Hash[Integer, Array[stage_entry]]
 
-    def self.run_stages: (String code, Array[Hash[singleton(Pipeline::BooleanShorten) | singleton(Pipeline::CharShorten) | singleton(Pipeline::ConstantFold) | singleton(Pipeline::ControlFlowSimplify) | singleton(Pipeline::EndlessMethod) | singleton(Pipeline::ParenOptimizer), Integer] | [singleton(Pipeline::ConstantAliaser) | singleton(Pipeline::VariableRenamer) | singleton(Pipeline::MethodRenamer)] | [singleton(Pipeline::ConstantAliaser) | singleton(Pipeline::VariableRenamer) | singleton(Pipeline::MethodRenamer), Hash[Symbol, untyped]]] stages, ?file_boundaries: Array[Pipeline::FileBoundary], ?stdlib_requires: Array[String], ?rbs_files: Hash[String, String]) -> Pipeline::RenameResult
+    def self.run_stages: (String code, Array[stage_entry] stages, ?file_boundaries: Array[Pipeline::FileBoundary], ?stdlib_requires: Array[String], ?rbs_files: Hash[String, String]) -> Pipeline::RenameResult
 
     attr_reader result: Pipeline::MinifiedResult?
 
