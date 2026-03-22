@@ -3,9 +3,9 @@ module RubyMinify
     module SourcePatcher
       private
 
-      def mk: (untyped node, String replacement) -> Hash[Symbol, untyped]
-      def apply_patches: (String source, Array[Hash[Symbol, untyped]] patches) -> String
-      def src: (String source, untyped node) -> String
+      def mk: (Prism::Node node, String replacement) -> { start: Integer, end: Integer, replacement: String }
+      def apply_patches: (String source, Array[{ start: Integer, end: Integer, replacement: String }] patches) -> String
+      def src: (String source, Prism::Node node) -> String
     end
   end
 end

@@ -552,7 +552,7 @@ class TestAstUtils < Minitest::Test
 
   def test_location_key_with_prism_node
     ast = Prism.parse("foo").value.statements.body.first
-    key = RubyMinify.location_key(ast)
+    key = RubyMinify::AstUtils.location_key(ast)
     assert_equal 2, key.size
     assert_equal 1 << 20 | 0, key[0]
     assert_equal 1 << 20 | 3, key[1]
@@ -560,7 +560,7 @@ class TestAstUtils < Minitest::Test
 
   def test_location_key_with_fake_node
     fake = FakeNodeSupport::FakeNode.new(5)
-    key = RubyMinify.location_key(fake)
+    key = RubyMinify::AstUtils.location_key(fake)
     assert_equal [5 << 20, 5 << 20], key
   end
 

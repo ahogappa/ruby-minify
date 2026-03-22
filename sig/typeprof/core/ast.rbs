@@ -7,21 +7,24 @@ module TypeProf
         attr_reader ret: BasicVertex
         attr_reader raw_node: Prism::Node
 
-        def traverse: () { (Node) -> void } -> void
+        def traverse: () { (Symbol, Node) -> void } -> void
         def each_subnode: () { (Node) -> void } -> void
-        def boxes: (Symbol kind) -> Array[untyped]
+        def boxes: (Symbol kind) { (Box) -> void } -> void
+        def code_range: () -> TypeProf::CodeRange
+        def object_id: () -> Integer
       end
 
       class CallBaseNode < Node
         attr_reader recv: Node?
         attr_reader mid: Symbol
-        attr_reader positional_args: Array[Node]?
+        attr_reader positional_args: Array[Node]
         attr_reader block_body: Node?
-        attr_reader block_f_args: Array[Symbol]?
+        attr_reader block_f_args: Array[Symbol]
         attr_reader block_pass: Node?
         attr_reader safe_navigation: bool
 
-        def keyword_args: () -> Array[Node]?
+        attr_reader keyword_args: Node?
+        attr_reader block_multi_targets: Hash[Integer, Prism::MultiTargetNode]?
       end
 
       class CallNode < CallBaseNode
@@ -57,18 +60,20 @@ module TypeProf
         attr_reader singleton: bool
         attr_reader mid: Symbol
         attr_reader body: Node?
+        attr_reader tbl: Array[Symbol]
+        attr_reader block: Node?
         attr_reader req_positionals: Array[Symbol]
-        attr_reader opt_positionals: Array[Array[untyped]]
+        attr_reader opt_positionals: Array[Symbol]
         attr_reader rest_positionals: Symbol?
         attr_reader post_positionals: Array[Symbol]
-        attr_reader req_keywords: Array[Array[untyped]]
-        attr_reader opt_keywords: Array[Array[untyped]]
+        attr_reader req_keywords: Array[Symbol]?
+        attr_reader opt_keywords: Array[Symbol]?
         attr_reader rest_keywords: Symbol?
         attr_reader block_param: Symbol?
       end
 
       class LiteralNode < Node
-        attr_reader lit: untyped
+        attr_reader lit: Symbol | String | Integer | Float | Rational | Complex | nil
       end
 
       class NilNode < LiteralNode
@@ -120,7 +125,7 @@ module TypeProf
       class ConstantWriteNode < Node
         attr_reader cpath: Array[Symbol]?
         attr_reader rhs: Node?
-        attr_reader static_cpath: Array[Symbol]?
+        attr_reader static_cpath: Array[Symbol]
       end
 
       class IfNode < Node
@@ -175,7 +180,7 @@ module TypeProf
 
       class BeginNode < Node
         attr_reader body: Node?
-        attr_reader rescue_clauses: Array[Node]?
+        attr_reader rescue_clauses: Array[Node]
         attr_reader else_body: Node?
         attr_reader ensure_body: Node?
       end
@@ -187,13 +192,13 @@ module TypeProf
 
       class ModuleNode < Node
         attr_reader body: Node?
-        attr_reader static_cpath: Array[Symbol]?
+        attr_reader static_cpath: Array[Symbol]
       end
 
       class ClassNode < Node
         attr_reader body: Node?
         attr_reader superclass_cpath: Node?
-        attr_reader static_cpath: Array[Symbol]?
+        attr_reader static_cpath: Array[Symbol]
       end
 
       class IncludeMetaNode < Node
@@ -201,11 +206,11 @@ module TypeProf
       end
 
       class AttrReaderMetaNode < Node
-        attr_reader args: Array[Node]?
+        attr_reader args: Array[Symbol]
       end
 
       class AttrAccessorMetaNode < Node
-        attr_reader args: Array[Node]?
+        attr_reader args: Array[Symbol]
       end
 
       class StatementsNode < Node
@@ -227,8 +232,8 @@ module TypeProf
       end
 
       class HashNode < Node
-        attr_reader keys: Array[Node]?
-        attr_reader vals: Array[Node]?
+        attr_reader keys: Array[Node?]
+        attr_reader vals: Array[Node]
       end
 
       class RangeNode < Node
@@ -251,12 +256,41 @@ module TypeProf
       end
 
       class AliasNode < Node
-        attr_reader new_mid: Symbol
-        attr_reader old_mid: Symbol
+        attr_reader new_mid: Node
+        attr_reader old_mid: Node
       end
 
       class UndefNode < Node
-        attr_reader names: Array[Symbol]
+        attr_reader names: Array[Node]
+      end
+
+      class LambdaNode < Node
+      end
+
+      class ForNode < Node
+        attr_reader body: Node?
+      end
+
+      class DefinedNode < Node
+      end
+
+      class GlobalVariableReadNode < Node
+        attr_reader var: Symbol
+      end
+
+      class GlobalVariableWriteNode < Node
+        attr_reader var: Symbol
+      end
+
+      class AliasGlobalVariableNode < Node
+      end
+
+      class ClassVariableReadNode < Node
+        attr_reader var: Symbol
+      end
+
+      class ClassVariableWriteNode < Node
+        attr_reader var: Symbol
       end
     end
   end

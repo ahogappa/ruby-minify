@@ -6,6 +6,7 @@ module RubyMinify
     attr_accessor usage_count: Integer
     attr_accessor char_savings: Integer
 
+    def self.new: (?prefix_path: Array[Symbol]?, ?prefix_string: String?, ?short_name: String?, ?usage_count: Integer?, ?char_savings: Integer?) -> ExternalPrefixInfo
     def initialize: (?prefix_path: Array[Symbol]?, ?prefix_string: String?, ?short_name: String?, ?usage_count: Integer?, ?char_savings: Integer?) -> void
   end
 
@@ -17,6 +18,7 @@ module RubyMinify
     attr_accessor definition_type: Symbol?
     attr_accessor scope_path: Array[Symbol]
 
+    def self.new: (?original_name: Symbol?, ?full_path: Array[Symbol]?, ?short_name: String?, ?usage_count: Integer?, ?definition_type: Symbol?, ?scope_path: Array[Symbol]?) -> ConstantInfo
     def initialize: (?original_name: Symbol?, ?full_path: Array[Symbol]?, ?short_name: String?, ?usage_count: Integer?, ?definition_type: Symbol?, ?scope_path: Array[Symbol]?) -> void
   end
 
@@ -33,10 +35,10 @@ module RubyMinify
     def exclude_path: (Array[Symbol] static_cpath) -> void
     def assign_short_names: (NameGenerator name_generator, ?skip_class_modules: bool) -> void
     def generate_alias_declarations: () -> Array[String]
-    def short_name_for_path: (Array[Symbol] static_cpath) -> String?
+    def short_name_for_path: (Array[Symbol]? static_cpath) -> String?
     def short_name_for: (Symbol name) -> String?
-    def user_defined_path?: (Array[Symbol] static_cpath) -> bool
-    def class_or_module_path?: (Array[Symbol] static_cpath) -> bool
+    def user_defined_path?: (Array[Symbol]? static_cpath) -> bool
+    def class_or_module_path?: (Array[Symbol]? static_cpath) -> bool
     def usage_count_for_path: (Array[Symbol] static_cpath) -> Integer
     def set_usage_count_by_path: (Array[Symbol] static_cpath, Integer count) -> void
     def each_user_defined_path: () { (Array[Symbol]) -> void } -> void

@@ -17,8 +17,8 @@ jobs:
       - run: bundle install --jobs 4
       - name: Run tests
         run: bundle exec rake test:all
-      - name: Validate RBS syntax
-        run: bundle exec rbs collection install && bundle exec rbs -I sig validate
+      - name: Type check with Steep
+        run: bundle exec rbs collection install && bundle exec steep check
 
   external-gems:
     runs-on: ubuntu-latest

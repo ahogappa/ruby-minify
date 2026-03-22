@@ -193,16 +193,16 @@ module RubyMinify
           case node
           when TypeProf::Core::AST::LocalVariableReadNode,
                TypeProf::Core::AST::LocalVariableWriteNode
-            map[location_key(node)] = get_mangled_name(node, node.var, scope_mappings)
+            map[AstUtils.location_key(node)] = get_mangled_name(node, node.var, scope_mappings)
           when TypeProf::Core::AST::DefNode
             raw = node.instance_variable_get(:@raw_node)
             next unless raw.receiver.is_a?(Prism::LocalVariableReadNode)
-            map[location_key(raw.receiver)] = get_mangled_name(node, raw.receiver.name, scope_mappings)
+            map[AstUtils.location_key(raw.receiver)] = get_mangled_name(node, raw.receiver.name, scope_mappings)
           when TypeProf::Core::AST::DefinedNode
             raw = node.instance_variable_get(:@raw_node)
             next unless raw.is_a?(Prism::DefinedNode) && raw.value.is_a?(Prism::LocalVariableReadNode)
             lvar_node = raw.value
-            map[location_key(lvar_node)] = get_mangled_name(node, lvar_node.name, scope_mappings)
+            map[AstUtils.location_key(lvar_node)] = get_mangled_name(node, lvar_node.name, scope_mappings)
           end
         end
         map
@@ -221,7 +221,7 @@ module RubyMinify
             when Prism::LocalVariableReadNode, Prism::LocalVariableWriteNode
               next if pnode.depth == 0
               mangled = find_scope_var_name(cref, pnode.name, scope_mappings)
-              variable_rename_entries[location_key(pnode)] = mangled if mangled
+              variable_rename_entries[AstUtils.location_key(pnode)] = mangled if mangled
             end
           end
         end
@@ -260,7 +260,7 @@ module RubyMinify
           case n
           when Prism::LocalVariableReadNode, Prism::LocalVariableWriteNode,
                Prism::LocalVariableTargetNode
-            keys << location_key(n) if n.name == var_name
+            keys << AstUtils.location_key(n) if n.name == var_name
           end
         end
         keys
@@ -347,7 +347,7 @@ module RubyMinify
             end
           end
 
-          block_param_names_map[location_key(node)] = block_param_names
+          block_param_names_map[AstUtils.location_key(node)] = block_param_names
         end
         block_param_names_map
       end
@@ -384,19 +384,19 @@ module RubyMinify
           next unless event == :enter
           case node
           when TypeProf::Core::AST::ConstantReadNode
-            key = location_key(node)
+            key = AstUtils.location_key(node)
             @const_resolution_map[key] = resolve_constant_read_cpath(node)
             @const_full_path_map[key] = build_constant_path(node)
           when TypeProf::Core::AST::ConstantWriteNode
-            @const_write_cpath_map[location_key(node)] = normalize_const_write_cpath(node)
+            @const_write_cpath_map[AstUtils.location_key(node)] = normalize_const_write_cpath(node)
           when TypeProf::Core::AST::ClassNode
-            key = location_key(node)
+            key = AstUtils.location_key(node)
             @class_cpath_map[key] = node.static_cpath
             if node.superclass_cpath
               @superclass_resolution_map[key] = resolve_constant_path(node.superclass_cpath, node.static_cpath)
             end
           when TypeProf::Core::AST::ModuleNode
-            @class_cpath_map[location_key(node)] = node.static_cpath
+            @class_cpath_map[AstUtils.location_key(node)] = node.static_cpath
           end
         end
       end
@@ -407,11 +407,11 @@ module RubyMinify
           next unless event == :enter
           case node
           when TypeProf::Core::AST::AttrReaderMetaNode
-            @meta_node_map[location_key(node)] = { type: :attr_reader, args: node.args }
+            @meta_node_map[AstUtils.location_key(node)] = { type: :attr_reader, args: node.args }
           when TypeProf::Core::AST::AttrAccessorMetaNode
-            @meta_node_map[location_key(node)] = { type: :attr_accessor, args: node.args }
+            @meta_node_map[AstUtils.location_key(node)] = { type: :attr_accessor, args: node.args }
           when TypeProf::Core::AST::IncludeMetaNode
-            @meta_node_map[location_key(node)] = { type: :include, args: node.args }
+            @meta_node_map[AstUtils.location_key(node)] = { type: :include, args: node.args }
           end
         end
       end

@@ -269,6 +269,13 @@ class TestConstantRenameMapping < Minitest::Test
     refute_equal internal_short, external_short
   end
 
+  def test_has_user_defined_prefix
+    @mapping.add_definition_with_path([:Foo, :Bar, :Baz], definition_type: :value)
+    assert @mapping.has_user_defined_prefix?([:Foo, :Bar, :Baz, :Qux])
+    refute @mapping.has_user_defined_prefix?([:Foo, :Bar])
+    refute @mapping.has_user_defined_prefix?([:Other])
+  end
+
   def test_preamble_induced_parent_prefix
     # Two sibling external prefixes + some code refs to parent
     @mapping.add_external_prefix([:TypeProf, :Core, :AST], usage_count: 20)

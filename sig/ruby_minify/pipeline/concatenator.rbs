@@ -19,9 +19,9 @@ module RubyMinify
       def concatenate_files: (DependencyGraph graph, Array[String] sorted_paths) -> ConcatenatedSource
       def collect_stdlib_requires: (FileEntry entry, Array[String] stdlib_requires) -> void
       def process_require_statements: (FileEntry entry, DependencyGraph graph, Set[String] inlined, Hash[String, String] cleaned_cache) -> String
-      def offset_based_processing: (String content, Array[Hash[Symbol, untyped]] nodes, DependencyGraph graph, Set[String] in_class_deps, Set[String] inlined, Hash[String, String] cleaned_cache) -> String
-      def line_based_processing: (String content, Array[Hash[Symbol, untyped]] require_nodes) -> String
-      def resolve_node_path: (Hash[Symbol, untyped] node, DependencyGraph graph) -> String?
+      def offset_based_processing: (String content, Array[require_node_info] nodes, DependencyGraph graph, Set[String] in_class_deps, Set[String] inlined, Hash[String, String] cleaned_cache) -> String
+      def line_based_processing: (String content, Array[require_node_info] require_nodes) -> String
+      def resolve_node_path: (require_node_info node, DependencyGraph graph) -> String?
       def strip_outer_nesting: (String content) -> String
     end
   end

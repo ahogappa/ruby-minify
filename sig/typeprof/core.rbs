@@ -1,4 +1,14 @@
 module TypeProf
+  class CodePosition
+    attr_reader lineno: Integer
+    attr_reader column: Integer
+  end
+
+  class CodeRange
+    attr_reader first: CodePosition
+    attr_reader last: CodePosition
+  end
+
   module Core
     class Service
       attr_reader genv: GlobalEnv
@@ -14,24 +24,27 @@ module TypeProf
       def each_superclass: (ModuleEntity mod, bool singleton) { (ModuleEntity, bool) -> void } -> void
     end
 
+    class Box
+    end
+
     class MethodEntity
-      attr_reader decls: Set[untyped]
-      attr_reader defs: Set[untyped]
-      attr_reader aliases: Hash[untyped, Symbol]
-      attr_reader method_call_boxes: Set[untyped]
+      attr_reader decls: Set[Box]
+      attr_reader defs: Set[Box]
+      attr_reader aliases: Hash[Box, Symbol]
+      attr_reader method_call_boxes: Set[Box]
       def exist?: () -> bool
     end
 
     class ValueEntity
-      attr_reader read_boxes: Set[untyped]
+      attr_reader read_boxes: Set[Box]
       attr_reader vtx: BasicVertex
     end
 
     class ModuleEntity
       attr_reader cpath: Array[Symbol]
       attr_reader superclass: ModuleEntity?
-      attr_reader included_modules: Hash[untyped, ModuleEntity]
-      attr_reader child_modules: Hash[ModuleEntity, untyped]
+      attr_reader included_modules: Hash[ModuleEntity, ModuleEntity]
+      attr_reader child_modules: Hash[ModuleEntity, ModuleEntity]
       attr_reader consts: Hash[Symbol, ValueEntity]
       attr_reader methods: Hash[bool, Hash[Symbol, MethodEntity]]
     end
@@ -48,7 +61,6 @@ module TypeProf
     end
 
     class LocalEnv
-      attr_reader path: String?
       attr_reader cref: CRef
       attr_reader locals: Hash[Symbol, BasicVertex]
     end

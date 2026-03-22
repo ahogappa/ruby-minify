@@ -11,9 +11,9 @@ module RubyMinify
       shorter = METHOD_ALIASES[node.mid]
       if shorter
         if node.recv
-          alias_map[location_key(node)] = shorter if alias_available_on_receiver?(node.recv, shorter, genv)
+          alias_map[AstUtils.location_key(node)] = shorter if alias_available_on_receiver?(node.recv, shorter, genv)
         else
-          alias_map[location_key(node)] = shorter
+          alias_map[AstUtils.location_key(node)] = shorter
         end
       end
 
@@ -21,7 +21,7 @@ module RubyMinify
         METHOD_TRANSFORMS.each do |(mid, type_name), replacement|
           next unless mid == node.mid
           if receiver_matches_type?(node.recv, type_name, genv)
-            transform_map[location_key(node)] = replacement
+            transform_map[AstUtils.location_key(node)] = replacement
             break
           end
         end

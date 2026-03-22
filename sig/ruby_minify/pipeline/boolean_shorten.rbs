@@ -4,6 +4,10 @@ module RubyMinify
       include SourcePatcher
 
       def call: (String input, **untyped) -> String
+
+      private
+
+      def walk: (Prism::Node node, Array[patch_entry] patches, ?inside_block_params: bool) -> void
     end
   end
 end

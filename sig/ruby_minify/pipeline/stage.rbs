@@ -1,7 +1,7 @@
 module RubyMinify
   module Pipeline
     class Stage
-      def call: (untyped input) -> untyped
+      def call: (String | ConcatenatedSource | DependencyGraph | Array[String] input) -> (String | ConcatenatedSource | AnalysisResult | DependencyGraph)
     end
   end
 end

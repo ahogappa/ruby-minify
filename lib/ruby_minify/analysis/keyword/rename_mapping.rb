@@ -73,7 +73,7 @@ module RubyMinify
           @methods[key][:call_entries].each do |sym, entries|
             short = keyword_map[sym]
             next unless short
-            entries.each { |e| @node_short_names[RubyMinify.location_key(e[:symbol_node])] = short }
+            entries.each { |e| @node_short_names[AstUtils.location_key(e[:symbol_node])] = short }
           end
         end
       end

@@ -157,6 +157,26 @@ class TestParenOptimizer < Minitest::Test
     assert_equal 'foo(bar, &baz)', optimize('foo(bar, &baz)')
   end
 
+  def test_call_inside_until_body
+    assert_equal 'until false;puts 1;end', optimize('until false;puts(1);end')
+  end
+
+  def test_call_inside_module_body
+    assert_equal 'module M;puts 1;end', optimize('module M;puts(1);end')
+  end
+
+  def test_call_inside_lambda_body
+    assert_equal '->(){ puts 1 }.call', optimize('->(){ puts(1) }.call')
+  end
+
+  def test_call_inside_parentheses
+    assert_equal '(puts 1)', optimize('(puts(1))')
+  end
+
+  def test_call_in_local_variable_write
+    assert_equal 'x = puts 1', optimize('x = puts(1)')
+  end
+
   # Ternary — arms are NOT at statement level
 
   def test_ternary_keeps_parens

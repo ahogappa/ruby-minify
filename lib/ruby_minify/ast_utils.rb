@@ -250,25 +250,21 @@ module RubyMinify
         false
       end
     end
-  end
 
-  # Location key for AST nodes — used by Analyzer and mapping classes.
-  # Always prefer Prism's byte-based location to avoid multi-byte character
-  # column mismatches with TypeProf's character-based code_range.
-  def location_key(node)
-    if node.respond_to?(:location)
-      loc = node.location
-      [loc.start_line << 20 | loc.start_column, loc.end_line << 20 | loc.end_column]
-    else
-      raw = node.instance_variable_get(:@raw_node)
-      if raw&.respond_to?(:location)
-        loc = raw.location
+    def self.location_key(node)
+      if node.respond_to?(:location)
+        loc = node.location
         [loc.start_line << 20 | loc.start_column, loc.end_line << 20 | loc.end_column]
       else
-        cr = node.code_range
-        [cr.first.lineno << 20 | cr.first.column, cr.last.lineno << 20 | cr.last.column]
+        raw = node.instance_variable_get(:@raw_node)
+        if raw&.respond_to?(:location)
+          loc = raw.location
+          [loc.start_line << 20 | loc.start_column, loc.end_line << 20 | loc.end_column]
+        else
+          cr = node.code_range
+          [cr.first.lineno << 20 | cr.first.column, cr.last.lineno << 20 | cr.last.column]
+        end
       end
     end
   end
-  module_function :location_key
 end
