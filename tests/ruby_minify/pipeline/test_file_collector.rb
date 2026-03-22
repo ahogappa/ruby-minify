@@ -270,4 +270,31 @@ class TestFileCollector < Minitest::Test
     assert_equal [], entry.dependencies
     assert_equal [], entry.in_class_dependencies
   end
+
+  def test_explicit_project_root_enables_bare_require_resolution
+    Dir.mktmpdir do |tmpdir|
+      lib_dir = File.join(tmpdir, 'lib')
+      Dir.mkdir(lib_dir)
+      File.write(File.join(lib_dir, 'helper.rb'), 'HELPER = 1')
+      File.write(File.join(lib_dir, 'entry.rb'), 'require "helper"')
+
+      $LOAD_PATH.unshift(lib_dir)
+      begin
+        # Without project_root: find_project_root returns nil (no Gemfile/.git)
+        # so bare requires are treated as stdlib
+        graph_without = @collector.call(File.join(lib_dir, 'entry.rb'))
+        entry_without = graph_without[File.join(lib_dir, 'entry.rb')]
+        stdlib_nodes = entry_without.require_nodes.select { |n| n[:type] == :require_stdlib }
+        assert_equal 1, stdlib_nodes.size, "Without project_root, bare require should be stdlib"
+
+        # With explicit project_root, bare requires under that root should be resolved
+        collector2 = RubyMinify::Pipeline::FileCollector.new
+        graph_with = collector2.call(File.join(lib_dir, 'entry.rb'), project_root: tmpdir)
+        helper_path = File.join(lib_dir, 'helper.rb')
+        assert graph_with[helper_path], "With project_root, bare require should be resolved"
+      ensure
+        $LOAD_PATH.delete(lib_dir)
+      end
+    end
+  end
 end

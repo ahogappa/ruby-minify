@@ -12,7 +12,7 @@ module RubyMinify
       # @raise [FileNotFoundError] If a required file doesn't exist
       # @raise [NoFilesError] If entry_path is nil or empty
       # @raise [DynamicRequireError] If a dynamic require is detected
-      def call(entry_path)
+      def call(entry_path, project_root: nil)
         raise NoFilesError.new if entry_path.nil?
 
         entry_paths = Array(entry_path)
@@ -20,7 +20,7 @@ module RubyMinify
 
         @graph = DependencyGraph.new
         @visited = Set.new
-        @project_root = find_project_root(entry_paths)
+        @project_root = project_root || find_project_root(entry_paths)
 
         entry_paths.each do |path|
           expanded = File.expand_path(path)

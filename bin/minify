@@ -7,7 +7,8 @@ require_relative '../lib/ruby_minify'
 options = {
   output: nil,
   aliases: nil,
-  level: nil
+  level: nil,
+  gem: nil
 }
 
 parser = OptionParser.new do |opts|
@@ -19,6 +20,10 @@ parser = OptionParser.new do |opts|
 
   opts.on("-a", "--aliases FILE", "Write constant alias declarations to FILE") do |file|
     options[:aliases] = file
+  end
+
+  opts.on("-g", "--gem GEM_NAME", "Minify an installed gem by name") do |name|
+    options[:gem] = name
   end
 
   opts.on("-c", "--compress LEVEL", "Set compression level (0-5, stable, unstable)") do |value|
@@ -50,25 +55,42 @@ rescue OptionParser::InvalidOption => e
   exit 1
 end
 
-if ARGV.empty?
-  warn "Error: No entry file specified"
-  warn parser
-  exit 1
-end
-
-ARGV.each do |file|
-  unless File.exist?(file)
-    warn "Error: File not found: #{file}"
+if options[:gem]
+  unless ARGV.empty?
+    warn "Error: Cannot specify both --gem and file arguments"
     exit 1
   end
-end
 
-entry = ARGV.size == 1 ? ARGV[0] : ARGV.dup
+  begin
+    resolution = RubyMinify::GemResolver.new.call(options[:gem])
+    entry = resolution.entry_path
+    project_root = resolution.project_root
+  rescue RubyMinify::Pipeline::GemNotFoundError => e
+    warn "Error: #{e.message}"
+    exit 1
+  end
+else
+  if ARGV.empty?
+    warn "Error: No entry file specified"
+    warn parser
+    exit 1
+  end
+
+  ARGV.each do |file|
+    unless File.exist?(file)
+      warn "Error: File not found: #{file}"
+      exit 1
+    end
+  end
+
+  entry = ARGV.size == 1 ? ARGV[0] : ARGV.dup
+  project_root = nil
+end
 
 begin
   minifier = RubyMinify::Minifier.new
   level_opts = options[:level] ? { level: options[:level] } : {}
-  result = minifier.call(entry, **level_opts)
+  result = minifier.call(entry, **level_opts, project_root: project_root)
 
   content = if options[:aliases]
     File.write(options[:aliases], result.aliases)

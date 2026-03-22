@@ -1,0 +1,12 @@
+module RubyMinify
+  class GemResolver
+    class GemResolution
+      attr_reader entry_path: String
+      attr_reader project_root: String
+
+      def self.new: (entry_path: String, project_root: String) -> GemResolution
+    end
+
+    def call: (String gem_name) -> GemResolution
+  end
+end

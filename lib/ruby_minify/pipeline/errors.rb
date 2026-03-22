@@ -51,5 +51,15 @@ module RubyMinify
         super("No files provided. Please provide an entry point file.")
       end
     end
+
+    # Raised when a gem cannot be found or has no Ruby entry file
+    class GemNotFoundError < StageError
+      attr_reader :gem_name
+
+      def initialize(gem_name)
+        @gem_name = gem_name
+        super("Gem not found: #{gem_name}")
+      end
+    end
   end
 end

@@ -22,6 +22,7 @@ require_relative "ruby_minify/analysis/gvar/collection"
 require_relative "ruby_minify/analysis/keyword/rename_mapping"
 require_relative "ruby_minify/analysis/keyword/collection"
 require_relative "ruby_minify/minifier"
+require_relative "ruby_minify/gem_resolver"
 
 module RubyMinify
   class Error < StandardError; end
