@@ -10,7 +10,7 @@ module RubyMinify
 
       private
 
-      def walk: (Prism::Node node, String source, Array[Hash[Symbol, untyped]] patches) -> void
+      def walk: (Prism::Node node, String source, Array[patch_entry] patches) -> void
       def try_if: (Prism::IfNode node, String source) -> String?
       def else_text_for_ternary: (Prism::Node? subsequent, String source) -> String?
       def build_ternary: (Prism::Node cond_node, String cond, Prism::Node? then_node, String? then_expr, String? else_expr) -> String

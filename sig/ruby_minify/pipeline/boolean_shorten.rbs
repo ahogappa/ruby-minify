@@ -7,7 +7,7 @@ module RubyMinify
 
       private
 
-      def walk: (Prism::Node node, Array[Hash[Symbol, untyped]] patches, ?inside_block_params: bool) -> void
+      def walk: (Prism::Node node, Array[patch_entry] patches, ?inside_block_params: bool) -> void
     end
   end
 end

@@ -7,7 +7,7 @@ module RubyMinify
 
       private
 
-      def walk: (Prism::Node node, String source, Array[Hash[Symbol, untyped]] patches) -> void
+      def walk: (Prism::Node node, String source, Array[patch_entry] patches) -> void
       def try_def: (Prism::DefNode node, String source) -> String?
       def keyword_logical?: (Prism::Node node, String source) -> bool
     end
