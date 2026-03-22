@@ -3,14 +3,14 @@ module TypeProf
     class AST
       class Node
         attr_reader lenv: LocalEnv
-        attr_reader static_ret: untyped
+        attr_reader static_ret: Node?
         attr_reader ret: BasicVertex
         attr_reader raw_node: Prism::Node
 
         def traverse: () { (Symbol, Node) -> void } -> void
         def each_subnode: () { (Node) -> void } -> void
-        def boxes: (Symbol kind) { (untyped) -> void } -> void
-        def code_range: () -> untyped
+        def boxes: (Symbol kind) { (Box) -> void } -> void
+        def code_range: () -> TypeProf::CodeRange
         def object_id: () -> Integer
       end
 
@@ -24,7 +24,7 @@ module TypeProf
         attr_reader safe_navigation: bool
 
         attr_reader keyword_args: Node?
-        attr_reader block_multi_targets: Hash[untyped, untyped]?
+        attr_reader block_multi_targets: Hash[Integer, Prism::MultiTargetNode]?
       end
 
       class CallNode < CallBaseNode
@@ -63,7 +63,7 @@ module TypeProf
         attr_reader tbl: Array[Symbol]
         attr_reader block: Node?
         attr_reader req_positionals: Array[Symbol]
-        attr_reader opt_positionals: Array[Array[untyped]]
+        attr_reader opt_positionals: Array[Symbol]
         attr_reader rest_positionals: Symbol?
         attr_reader post_positionals: Array[Symbol]
         attr_reader req_keywords: Array[Symbol]?
@@ -73,7 +73,7 @@ module TypeProf
       end
 
       class LiteralNode < Node
-        attr_reader lit: untyped
+        attr_reader lit: Symbol | String | Integer | Float | Rational | Complex | nil
       end
 
       class NilNode < LiteralNode
@@ -119,7 +119,7 @@ module TypeProf
         attr_reader cname: Symbol
         attr_reader cbase: Node?
         attr_reader toplevel: bool
-        attr_reader static_ret: untyped
+        attr_reader static_ret: Node?
       end
 
       class ConstantWriteNode < Node
@@ -180,7 +180,7 @@ module TypeProf
 
       class BeginNode < Node
         attr_reader body: Node?
-        attr_reader rescue_clauses: Array[untyped]
+        attr_reader rescue_clauses: Array[Node]
         attr_reader else_body: Node?
         attr_reader ensure_body: Node?
       end
@@ -256,12 +256,12 @@ module TypeProf
       end
 
       class AliasNode < Node
-        attr_reader new_mid: untyped
-        attr_reader old_mid: untyped
+        attr_reader new_mid: Node
+        attr_reader old_mid: Node
       end
 
       class UndefNode < Node
-        attr_reader names: Array[untyped]
+        attr_reader names: Array[Node]
       end
 
       class LambdaNode < Node
