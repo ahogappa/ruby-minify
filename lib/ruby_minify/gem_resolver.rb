@@ -2,14 +2,18 @@
 
 module RubyMinify
   class GemResolver
-    GemResolution = Data.define(:entry_path, :project_root)
+    GemResolution = Data.define(:entry_path, :project_root, :require_paths)
 
     def call(gem_name)
       spec = Gem::Specification.find_by_name(gem_name)
       entry_path = find_entry_file(spec, gem_name)
       raise Pipeline::GemNotFoundError.new(gem_name) unless entry_path
 
-      GemResolution.new(entry_path: entry_path, project_root: spec.gem_dir)
+      GemResolution.new(
+        entry_path: entry_path,
+        project_root: spec.gem_dir,
+        require_paths: spec.full_require_paths
+      )
     rescue Gem::MissingSpecError
       raise Pipeline::GemNotFoundError.new(gem_name)
     end

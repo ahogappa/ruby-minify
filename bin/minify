@@ -72,6 +72,7 @@ if options[:gems]
     entry = resolutions.map(&:entry_path)
     entry = entry.first if entry.size == 1
     project_root = resolutions.map(&:project_root)
+    gem_require_paths = resolutions.flat_map(&:require_paths)
   rescue RubyMinify::Pipeline::GemNotFoundError => e
     warn "Error: #{e.message}"
     exit 1
@@ -92,6 +93,7 @@ else
 
   entry = ARGV.size == 1 ? ARGV[0] : ARGV.dup
   project_root = nil
+  gem_require_paths = []
 end
 
 gem_names = options[:gems] || []
@@ -99,7 +101,7 @@ gem_names = options[:gems] || []
 begin
   minifier = RubyMinify::Minifier.new
   level_opts = options[:level] ? { level: options[:level] } : {}
-  result = minifier.call(entry, **level_opts, project_root: project_root, gem_names: gem_names)
+  result = minifier.call(entry, **level_opts, project_root: project_root, gem_names: gem_names, gem_require_paths: gem_require_paths)
 
   content = if options[:aliases]
     File.write(options[:aliases], result.aliases)

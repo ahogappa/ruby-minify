@@ -12,7 +12,7 @@ module RubyMinify
       # @raise [FileNotFoundError] If a required file doesn't exist
       # @raise [NoFilesError] If entry_path is nil or empty
       # @raise [DynamicRequireError] If a dynamic require is detected
-      def call(entry_path, project_root: nil, gem_names: [])
+      def call(entry_path, project_root: nil, gem_names: [], gem_require_paths: [])
         raise NoFilesError.new if entry_path.nil?
 
         entry_paths = Array(entry_path)
@@ -28,7 +28,7 @@ module RubyMinify
           root ? [root] : []
         end
 
-        activate_gems(gem_names)
+        ensure_load_paths(gem_require_paths)
 
         entry_paths.each do |path|
           expanded = File.expand_path(path)
@@ -241,14 +241,9 @@ module RubyMinify
         end
       end
 
-      def activate_gems(gem_names)
-        gem_names.each do |name|
-          spec = Gem::Specification.find_by_name(name)
-          spec.full_require_paths.each do |path|
-            $LOAD_PATH.unshift(path) unless $LOAD_PATH.include?(path)
-          end
-        rescue Gem::MissingSpecError
-          # Already handled by GemResolver; ignore here
+      def ensure_load_paths(require_paths)
+        require_paths.each do |path|
+          $LOAD_PATH.unshift(path) unless $LOAD_PATH.include?(path)
         end
       end
 
