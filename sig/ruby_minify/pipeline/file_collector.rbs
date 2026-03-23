@@ -16,6 +16,7 @@ module RubyMinify
       def handle_autoload: (Prism::CallNode node, Array[require_node_info] nodes, String file_path, ?in_method: bool, ?in_class: bool) -> void
       def collect_rbs_files: (Array[String] entry_paths) -> void
       def collect_rbs_stdlib_files: () -> void
+      def load_rbs_from: (String dir) -> void
       def find_project_root: (Array[String] entry_paths) -> String?
       def resolve_relative_path: (String path, String from_file) -> String
       def resolve_bare_require: (String path) -> String?

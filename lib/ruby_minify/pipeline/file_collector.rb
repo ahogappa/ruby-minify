@@ -241,12 +241,7 @@ module RubyMinify
 
       def collect_rbs_files(_entry_paths)
         @project_roots.each do |root|
-          sig_dir = File.join(root, "sig")
-          next unless File.directory?(sig_dir)
-
-          Dir.glob(File.join(sig_dir, "**", "*.rbs")).each do |path|
-            @graph.rbs_files[path] = File.read(path)
-          end
+          load_rbs_from(File.join(root, "sig"))
         end
 
         collect_rbs_stdlib_files
@@ -255,21 +250,20 @@ module RubyMinify
       def collect_rbs_stdlib_files
         return if @gem_names.empty?
 
-        require 'rbs'
         stdlib_root = RBS::Repository::DEFAULT_STDLIB_ROOT
-        return unless File.directory?(stdlib_root)
 
         @gem_names.each do |gem_name|
           gem_rbs_dir = File.join(stdlib_root, gem_name)
-          next unless File.directory?(gem_rbs_dir)
-
-          versions = Dir.entries(gem_rbs_dir).reject { |e| e.start_with?('.') }.sort
+          versions = Dir.children(gem_rbs_dir).sort rescue next
           next if versions.empty?
 
-          version_dir = File.join(gem_rbs_dir, versions.last)
-          Dir.glob(File.join(version_dir, "**", "*.rbs")).each do |path|
-            @graph.rbs_files[path] = File.read(path)
-          end
+          load_rbs_from(File.join(gem_rbs_dir, versions.last))
+        end
+      end
+
+      def load_rbs_from(dir)
+        Dir.glob(File.join(dir, "**", "*.rbs")).each do |path|
+          @graph.rbs_files[path] = File.read(path)
         end
       end
 
