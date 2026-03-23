@@ -5,6 +5,7 @@ require_relative '../test_helper'
 class TestGemResolver < Minitest::Test
   def setup
     @resolver = RubyMinify::GemResolver.new
+    skip "json gem not available" unless Gem::Specification.find_all_by_name("json").any?
   end
 
   def test_resolve_known_gem
@@ -29,6 +30,13 @@ class TestGemResolver < Minitest::Test
   def test_entry_path_is_under_project_root
     result = @resolver.call("json")
     assert result.entry_path.start_with?(result.project_root)
+  end
+
+  def test_resolve_hyphenated_gem_with_underscore_entry
+    skip "ruby-minify gem not available" unless Gem::Specification.find_all_by_name("ruby-minify").any?
+    result = @resolver.call("ruby-minify")
+    assert File.exist?(result.entry_path)
+    assert result.entry_path.end_with?("ruby_minify.rb")
   end
 
   def test_resolve_unknown_gem_raises

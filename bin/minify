@@ -12,7 +12,7 @@ options = {
 }
 
 parser = OptionParser.new do |opts|
-  opts.banner = "Usage: minify [options] FILE..."
+  opts.banner = "Usage: minify [options] [FILE...]"
 
   opts.on("-o", "--output FILE", "Write output to FILE instead of stdout") do |file|
     options[:output] = file
@@ -23,7 +23,7 @@ parser = OptionParser.new do |opts|
   end
 
   opts.on("-g", "--gem GEM_NAMES", "Minify installed gem(s) by name (comma-separated)") do |names|
-    options[:gems] = names.split(',').map(&:strip)
+    options[:gems] = names.split(',').map(&:strip).reject(&:empty?)
   end
 
   opts.on("-c", "--compress LEVEL", "Set compression level (0-5, stable, unstable)") do |value|
@@ -58,6 +58,11 @@ end
 if options[:gems]
   unless ARGV.empty?
     warn "Error: Cannot specify both --gem and file arguments"
+    exit 1
+  end
+
+  if options[:gems].empty?
+    warn "Error: No gem names specified"
     exit 1
   end
 
