@@ -14,6 +14,7 @@ module RubyMinify
       def handle_require_relative: (Prism::CallNode node, Array[require_node_info] nodes, String file_path, ?in_method: bool, ?in_class: bool) -> void
       def handle_require: (Prism::CallNode node, Array[require_node_info] nodes, String file_path, ?in_method: bool, ?in_class: bool) -> void
       def handle_autoload: (Prism::CallNode node, Array[require_node_info] nodes, String file_path, ?in_method: bool, ?in_class: bool) -> void
+      def activate_gems: (Array[String] gem_names) -> void
       def collect_rbs_files: (Array[String] entry_paths) -> void
       def collect_rbs_stdlib_files: () -> void
       def load_rbs_from: (String dir) -> void

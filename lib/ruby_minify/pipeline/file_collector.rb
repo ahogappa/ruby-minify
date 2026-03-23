@@ -22,11 +22,13 @@ module RubyMinify
         @visited = Set.new
         @gem_names = gem_names
         @project_roots = if project_root
-          Array(project_root)
+          Array(project_root).map { |p| File.expand_path(p) }
         else
           root = find_project_root(entry_paths)
           root ? [root] : []
         end
+
+        activate_gems(gem_names)
 
         entry_paths.each do |path|
           expanded = File.expand_path(path)
@@ -239,6 +241,17 @@ module RubyMinify
         end
       end
 
+      def activate_gems(gem_names)
+        gem_names.each do |name|
+          spec = Gem::Specification.find_by_name(name)
+          spec.full_require_paths.each do |path|
+            $LOAD_PATH.unshift(path) unless $LOAD_PATH.include?(path)
+          end
+        rescue Gem::MissingSpecError
+          # Already handled by GemResolver; ignore here
+        end
+      end
+
       def collect_rbs_files(_entry_paths)
         @project_roots.each do |root|
           load_rbs_from(File.join(root, "sig"))
@@ -254,10 +267,11 @@ module RubyMinify
 
         @gem_names.each do |gem_name|
           gem_rbs_dir = File.join(stdlib_root, gem_name)
-          versions = Dir.children(gem_rbs_dir).sort rescue next
+          versions = Dir.children(gem_rbs_dir) rescue next
           next if versions.empty?
 
-          load_rbs_from(File.join(gem_rbs_dir, versions.last))
+          latest = versions.max_by { |v| Gem::Version.new(v) }
+          load_rbs_from(File.join(gem_rbs_dir, latest))
         end
       end
 
@@ -289,7 +303,7 @@ module RubyMinify
 
         type, abs_path = result
         return nil unless type == :rb
-        return nil unless @project_roots.any? { |root| abs_path.start_with?(root) }
+        return nil unless @project_roots.any? { |root| abs_path.start_with?("#{root}/") }
 
         abs_path
       end
