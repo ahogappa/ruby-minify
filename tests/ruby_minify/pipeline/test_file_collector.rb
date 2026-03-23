@@ -219,6 +219,19 @@ class TestFileCollector < Minitest::Test
     end
   end
 
+  def test_rbs_files_collected_from_rbs_stdlib_for_gems
+    # When gem_names are provided, RBS stdlib definitions should be collected
+    Dir.mktmpdir do |tmpdir|
+      File.write(File.join(tmpdir, 'entry.rb'), 'require "json"')
+      File.write(File.join(tmpdir, 'Gemfile'), '')
+
+      graph = @collector.call(File.join(tmpdir, 'entry.rb'), gem_names: ['json'])
+      rbs_files = graph.rbs_files
+      json_rbs = rbs_files.keys.select { |path| path.include?('json') }
+      refute_empty json_rbs, "RBS stdlib definitions for json should be collected"
+    end
+  end
+
   def test_rbs_files_empty_when_no_sig_directory
     Dir.mktmpdir do |tmpdir|
       File.write(File.join(tmpdir, 'entry.rb'), 'X = 1')

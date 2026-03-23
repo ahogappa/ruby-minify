@@ -89,10 +89,12 @@ else
   project_root = nil
 end
 
+gem_names = options[:gems] || []
+
 begin
   minifier = RubyMinify::Minifier.new
   level_opts = options[:level] ? { level: options[:level] } : {}
-  result = minifier.call(entry, **level_opts, project_root: project_root)
+  result = minifier.call(entry, **level_opts, project_root: project_root, gem_names: gem_names)
 
   content = if options[:aliases]
     File.write(options[:aliases], result.aliases)

@@ -12,7 +12,7 @@ module RubyMinify
       # @raise [FileNotFoundError] If a required file doesn't exist
       # @raise [NoFilesError] If entry_path is nil or empty
       # @raise [DynamicRequireError] If a dynamic require is detected
-      def call(entry_path, project_root: nil)
+      def call(entry_path, project_root: nil, gem_names: [])
         raise NoFilesError.new if entry_path.nil?
 
         entry_paths = Array(entry_path)
@@ -20,6 +20,7 @@ module RubyMinify
 
         @graph = DependencyGraph.new
         @visited = Set.new
+        @gem_names = gem_names
         @project_roots = if project_root
           Array(project_root)
         else
@@ -244,6 +245,29 @@ module RubyMinify
           next unless File.directory?(sig_dir)
 
           Dir.glob(File.join(sig_dir, "**", "*.rbs")).each do |path|
+            @graph.rbs_files[path] = File.read(path)
+          end
+        end
+
+        collect_rbs_stdlib_files
+      end
+
+      def collect_rbs_stdlib_files
+        return if @gem_names.empty?
+
+        require 'rbs'
+        stdlib_root = RBS::Repository::DEFAULT_STDLIB_ROOT
+        return unless File.directory?(stdlib_root)
+
+        @gem_names.each do |gem_name|
+          gem_rbs_dir = File.join(stdlib_root, gem_name)
+          next unless File.directory?(gem_rbs_dir)
+
+          versions = Dir.entries(gem_rbs_dir).reject { |e| e.start_with?('.') }.sort
+          next if versions.empty?
+
+          version_dir = File.join(gem_rbs_dir, versions.last)
+          Dir.glob(File.join(version_dir, "**", "*.rbs")).each do |path|
             @graph.rbs_files[path] = File.read(path)
           end
         end

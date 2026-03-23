@@ -19,7 +19,7 @@ module RubyMinify
     attr_reader result: Pipeline::MinifiedResult?
 
     def initialize: () -> void
-    def call: (String | Array[String] entry_path, ?level: Integer, ?project_root: String | Array[String] | nil) -> Pipeline::MinifiedResult
+    def call: (String | Array[String] entry_path, ?level: Integer, ?project_root: String | Array[String] | nil, ?gem_names: Array[String]) -> Pipeline::MinifiedResult
 
     private
 
