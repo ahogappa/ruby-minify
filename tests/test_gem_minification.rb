@@ -8,12 +8,13 @@ require_relative '../lib/ruby_minify'
 
 # Test that minified gems pass their own test suites.
 # Excluded from default `rake test` — run with `rake test:gems`.
+# Requires BUNDLE_GEMFILE=Gemfile.gems_test so target gems are available.
 class TestGemMinification < Minitest::Test
   GEM_TESTS_DIR = File.expand_path('../gem_tests', __dir__)
 
   GEMS = {
     sinatra: {
-      source: 'sinatra/lib/sinatra/base.rb',
+      gem_name: 'sinatra',
       test_files: %w[
         sinatra/test/routing_test.rb
         sinatra/test/helpers_test.rb
@@ -54,14 +55,11 @@ class TestGemMinification < Minitest::Test
         sinatra/test/slim_test.rb
         sinatra/test/yajl_test.rb
       ],
-      lib_name: 'sinatra/base',
-      extra_includes: ['sinatra/rack-protection/lib'],
-      copy_files: %w[sinatra/lib/sinatra/middleware sinatra/lib/sinatra/version.rb sinatra/lib/sinatra/show_exceptions.rb sinatra/lib/sinatra/indifferent_hash.rb],
       min_level: 3,
-      max_level: 3,  # L4+ has class/method renaming issues with sinatra
+      max_level: 3,
     },
     rubocop: {
-      source: 'rubocop/lib/rubocop.rb',
+      gem_name: 'rubocop',
       test_file_patterns: ['rubocop/spec/rubocop/**/*_spec.rb'],
       exclude_test_patterns: %w[
         rubocop/spec/rubocop/server/**/*_spec.rb
@@ -75,53 +73,36 @@ class TestGemMinification < Minitest::Test
         rubocop/spec/rubocop/mcp/server_spec.rb
         rubocop/spec/rubocop/runner_formatter_invocation_spec.rb
       ],
-      lib_name: 'rubocop',
       test_runner: :rspec,
-      gem_dir: 'rubocop',
-      copy_files: %w[rubocop/lib/rubocop/cop/internal_affairs rubocop/lib/rubocop/cop/internal_affairs.rb rubocop/lib/rubocop/server.rb rubocop/lib/rubocop/server rubocop/lib/rubocop/rspec],
-      file_depth: 2,
-      project_files: %w[rubocop/config],
       min_level: 3,
-      max_level: 3  # L4+ constant aliasing breaks rubocop's cop registry
+      max_level: 3,
     }
   }.freeze
 
-  GEMS.each do |gem_name, config|
+  GEMS.each do |gem_key, config|
     min_level = config[:min_level] || 0
     max_level = config[:max_level] || 5
     (min_level..max_level).each do |level|
-      define_method(:"test_#{gem_name}_level#{level}") do
-        source_path = File.join(GEM_TESTS_DIR, config[:source])
-        test_files = Array(config[:test_files] || config[:test_file]).map { |f| File.join(GEM_TESTS_DIR, f) }
-        if config[:test_file_patterns]
-          excludes = Array(config[:exclude_test_files]).map { |f| File.join(GEM_TESTS_DIR, f) }
-          Array(config[:exclude_test_patterns]).each do |pat|
-            excludes.concat(Dir.glob(File.join(GEM_TESTS_DIR, pat)))
-          end
-          config[:test_file_patterns].each do |pattern|
-            test_files.concat(Dir.glob(File.join(GEM_TESTS_DIR, pattern)) - excludes)
-          end
-          test_files.uniq!
+      define_method(:"test_#{gem_key}_level#{level}") do
+        gem_name = config[:gem_name]
+
+        begin
+          resolution = RubyMinify::GemResolver.new.call(gem_name)
+        rescue RubyMinify::Pipeline::GemNotFoundError
+          skip "#{gem_name} gem not available (use BUNDLE_GEMFILE=Gemfile.gems_test)"
         end
-        skip "gem source not found: #{source_path}" unless File.exist?(source_path)
+
+        test_files = resolve_test_files(config)
+        skip "no test files found for #{gem_name} (clone repos into gem_tests/)" if test_files.empty?
         test_files.each { |f| skip "gem test not found: #{f}" unless File.exist?(f) }
 
-        extra_includes = (config[:extra_includes] || []).map { |p| File.join(GEM_TESTS_DIR, p) }
-        copy_files = (config[:copy_files] || []).map { |p| File.join(GEM_TESTS_DIR, p) }
-        project_files = (config[:project_files] || []).map { |p| File.join(GEM_TESTS_DIR, p) }
-        gem_dir = config[:gem_dir] ? File.join(GEM_TESTS_DIR, config[:gem_dir]) : nil
+        gem_dir = File.join(GEM_TESTS_DIR, gem_key.to_s)
         assert_minified_gem_passes(
-          source_path: source_path,
+          resolution: resolution,
           test_files: test_files,
-          lib_name: config[:lib_name],
-          lib_dir: File.join(GEM_TESTS_DIR, File.dirname(config[:source])),
           level: level,
-          gem_name: gem_name,
-          extra_includes: extra_includes,
-          copy_files: copy_files,
+          gem_name: gem_key,
           test_runner: config[:test_runner],
-          file_depth: config[:file_depth] || 0,
-          project_files: project_files,
           gem_dir: gem_dir
         )
       end
@@ -130,42 +111,42 @@ class TestGemMinification < Minitest::Test
 
   private
 
-  def assert_minified_gem_passes(source_path:, test_files:, lib_name:, lib_dir:, level:, gem_name:, extra_includes: [], copy_files: [], test_runner: nil, file_depth: 0, project_files: [], gem_dir: nil)
-    # Run baseline (original code) to find environment-specific failures
-    baseline_failures = baseline_failures_for(gem_name, test_files, lib_dir,
-                                               extra_includes: extra_includes, test_runner: test_runner, gem_dir: gem_dir)
+  def resolve_test_files(config)
+    test_files = Array(config[:test_files]).map { |f| File.join(GEM_TESTS_DIR, f) }
+    if config[:test_file_patterns]
+      excludes = Array(config[:exclude_test_files]).map { |f| File.join(GEM_TESTS_DIR, f) }
+      Array(config[:exclude_test_patterns]).each do |pat|
+        excludes.concat(Dir.glob(File.join(GEM_TESTS_DIR, pat)))
+      end
+      config[:test_file_patterns].each do |pattern|
+        test_files.concat(Dir.glob(File.join(GEM_TESTS_DIR, pattern)) - excludes)
+      end
+      test_files.uniq!
+    end
+    test_files
+  end
+
+  def assert_minified_gem_passes(resolution:, test_files:, level:, gem_name:, test_runner: nil, gem_dir: nil)
+    baseline_failures = baseline_failures_for(gem_name, test_files, resolution, test_runner: test_runner, gem_dir: gem_dir)
 
     minifier = RubyMinify::Minifier.new
-    result = minifier.call(source_path, level: level)
+    result = minifier.call(
+      resolution.entry_path,
+      level: level,
+      project_root: resolution.project_root,
+      gem_names: [gem_name.to_s],
+      gem_require_paths: resolution.require_paths
+    )
 
-    content = if result.aliases.empty?
-      result.content
-    else
-      "#{result.content};#{result.aliases}"
-    end
+    content = result.aliases.empty? ? result.content : "#{result.content};#{result.aliases}"
 
     Dir.mktmpdir("minify_gem_test") do |tmpdir|
-      # file_depth: nest the minified file N levels deep so __FILE__-relative
-      # paths (e.g., RUBOCOP_HOME = File.dirname(__FILE__)/../..) resolve correctly
-      if file_depth > 0
-        nested_dir = File.join(tmpdir, *Array.new(file_depth, 'x'))
-        FileUtils.mkdir_p(nested_dir)
-        minified_path = File.join(nested_dir, "#{lib_name}.rb")
-        actual_lib_dir = nested_dir
-      else
-        minified_path = File.join(tmpdir, "#{lib_name}.rb")
-        actual_lib_dir = tmpdir
-      end
+      relative = resolution.entry_path.delete_prefix("#{resolution.require_paths.first}/")
+      minified_path = File.join(tmpdir, relative)
       FileUtils.mkdir_p(File.dirname(minified_path))
       File.write(minified_path, content)
 
-      gem_root = File.expand_path('..', File.dirname(source_path))
-      project_files.each { |src| copy_relative(src, gem_root, tmpdir) }
-      copy_files.each { |src| copy_relative(src, File.dirname(source_path), File.dirname(minified_path)) }
-      # Create stub files for require_relative targets in copied files that
-      # don't exist (their code is already in the minified output)
-      create_require_stubs(File.dirname(minified_path))
-      minified = run_gem_tests(test_files, actual_lib_dir, extra_includes: extra_includes, test_runner: test_runner, gem_dir: gem_dir)
+      minified = run_gem_tests(test_files, tmpdir, test_runner: test_runner, gem_dir: gem_dir)
       minified_count = parse_test_count(minified[:stdout])
       assert minified_count,
         "#{gem_name} L#{level}: no test summary found (minified code likely crashed)\nstderr: #{minified[:stderr][0, 300]}"
@@ -177,11 +158,11 @@ class TestGemMinification < Minitest::Test
     end
   end
 
-  def baseline_failures_for(gem_name, test_files, lib_dir, extra_includes: [], test_runner: nil, gem_dir: nil)
+  def baseline_failures_for(gem_name, test_files, resolution, test_runner: nil, gem_dir: nil)
     cache = self.class.baseline_cache
     return cache[gem_name] if cache.key?(gem_name)
 
-    baseline = run_gem_tests(test_files, lib_dir, extra_includes: extra_includes, test_runner: test_runner, gem_dir: gem_dir)
+    baseline = run_gem_tests(test_files, resolution.require_paths.first, test_runner: test_runner, gem_dir: gem_dir)
     cache[gem_name] = parse_test_result(baseline[:stdout])
   end
 
@@ -189,19 +170,15 @@ class TestGemMinification < Minitest::Test
     @baseline_cache ||= {}
   end
 
-  def run_gem_tests(test_files, lib_dir, extra_includes: [], test_runner: nil, gem_dir: nil)
+  def run_gem_tests(test_files, lib_dir, test_runner: nil, gem_dir: nil)
     test_files = Array(test_files)
-    include_args = ["-I", lib_dir] + extra_includes.flat_map { |p| ["-I", p] }
+    include_args = ["-I", lib_dir]
 
     if test_runner == :rspec
       args = build_rspec_args(test_files, lib_dir, include_args)
     elsif test_files.size == 1
       args = [*include_args, test_files.first]
     else
-      # Multiple test files: use a runner script that keeps lib_dir at the
-      # front of $LOAD_PATH even if test helpers prepend their own lib dirs.
-      # Without this, gems like sinatra whose test_helper does
-      # $LOAD_PATH.unshift(original_lib) would bypass our minified lib.
       runner = Tempfile.new(['gem_test_runner', '.rb'])
       runner.write(<<~RUBY)
         minified_lib = #{lib_dir.inspect}
@@ -219,8 +196,6 @@ class TestGemMinification < Minitest::Test
       runner.flush
       args = [*include_args, runner.path]
     end
-    # Use temp files instead of Open3.capture3 to avoid pipe buffer
-    # deadlocks when test output is very large (e.g. 30k+ rspec examples)
     stdout_file = Tempfile.new('gem_test_stdout')
     stderr_file = Tempfile.new('gem_test_stderr')
     stdout_file.close
@@ -279,35 +254,9 @@ class TestGemMinification < Minitest::Test
     nil
   end
 
-  def copy_relative(src, base_from, base_to)
-    relative = src.sub(base_from + '/', '')
-    dst = File.join(base_to, relative)
-    FileUtils.mkdir_p(File.dirname(dst))
-    if File.directory?(src)
-      FileUtils.cp_r(src, dst)
-    else
-      FileUtils.cp(src, dst)
-    end
-  end
-
-  def create_require_stubs(base_dir)
-    Dir.glob(File.join(base_dir, '**', '*.rb')).each do |file|
-      File.read(file).scan(/require_relative\s+['"]([^'"]+)['"]/).each do |match|
-        rel_path = match[0]
-        target = File.expand_path(rel_path, File.dirname(file))
-        target += '.rb' unless target.end_with?('.rb')
-        next if File.exist?(target)
-        FileUtils.mkdir_p(File.dirname(target))
-        File.write(target, "# stub: code already in minified output\n")
-      end
-    end
-  end
-
   def parse_test_count(output)
-    # minitest: "5 runs, ..." / test-unit: "27 tests, ..."
     if output =~ /(\d+) (?:runs?|tests?),/
       $1.to_i
-    # rspec: "1028 examples, 0 failures"
     elsif output =~ /(\d+) examples?,/
       $1.to_i
     end
@@ -316,17 +265,14 @@ class TestGemMinification < Minitest::Test
   def parse_test_result(output)
     failures = []
 
-    # test/unit format: "Failure: test_name(ClassName)" or "Error: test_name(ClassName): ..."
     output.scan(/^(?:Failure|Error): (\S+)\((\S+)\)/) do |test_name, klass|
       failures << "#{klass}##{test_name}"
     end
 
-    # minitest format: "  1) Failure:\nTestClass#test_name [path:line]:"
     output.scan(/^\s+\d+\) (?:Failure|Error):\n(\S+#\S+)/) do |match|
       failures << match[0]
     end
 
-    # rspec format: "rspec ./spec/path/file_spec.rb:42 # Description text"
     output.scan(/^rspec (\S+:\d+)/) do |match|
       failures << match[0]
     end

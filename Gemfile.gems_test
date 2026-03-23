@@ -1,0 +1,6 @@
+# frozen_string_literal: true
+
+eval_gemfile "Gemfile"
+
+gem "sinatra", path: "gem_tests/sinatra"
+gem "rubocop", path: "gem_tests/rubocop"

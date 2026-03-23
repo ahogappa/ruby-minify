@@ -24,23 +24,20 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     timeout-minutes: 40
+    env:
+      BUNDLE_GEMFILE: Gemfile.gems_test
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "4.0"
-          bundler-cache: true
       - name: Clone gem sources
         run: |
           mkdir -p gem_tests
           cd gem_tests
           git clone --depth 1 https://github.com/sinatra/sinatra
           git clone --depth 1 https://github.com/rubocop/rubocop
-      - name: Install sinatra test dependencies
-        working-directory: gem_tests/sinatra
-        run: bundle install --jobs 4
-      - name: Install rubocop test dependencies
-        working-directory: gem_tests/rubocop
+      - name: Install dependencies
         run: bundle install --jobs 4
       - name: Run gem integration tests
         run: bundle exec rake test:gems
