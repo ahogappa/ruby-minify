@@ -118,8 +118,8 @@ module RubyMinify
       @preprocessor = Pipeline::Preprocessor.new
     end
 
-    def call(entry_path, level: DEFAULT_LEVEL)
-      graph = @file_collector.call(entry_path)
+    def call(entry_path, level: DEFAULT_LEVEL, project_root: nil, gem_names: [], gem_require_paths: [])
+      graph = @file_collector.call(entry_path, project_root: project_root, gem_names: gem_names, gem_require_paths: gem_require_paths)
       source = @concatenator.call(graph)
       source = @preprocessor.call(source)
 

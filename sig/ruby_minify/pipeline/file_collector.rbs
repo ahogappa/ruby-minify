@@ -3,7 +3,7 @@ module RubyMinify
     type require_node_info = { type: Symbol, path: String, line: Integer, start_offset: Integer, length: Integer, in_class: bool }
 
     class FileCollector < Stage
-      def call: (String | Array[String] entry_path) -> DependencyGraph
+      def call: (String | Array[String] entry_path, ?project_root: String | Array[String] | nil, ?gem_names: Array[String], ?gem_require_paths: Array[String]) -> DependencyGraph
 
       private
 
@@ -14,7 +14,10 @@ module RubyMinify
       def handle_require_relative: (Prism::CallNode node, Array[require_node_info] nodes, String file_path, ?in_method: bool, ?in_class: bool) -> void
       def handle_require: (Prism::CallNode node, Array[require_node_info] nodes, String file_path, ?in_method: bool, ?in_class: bool) -> void
       def handle_autoload: (Prism::CallNode node, Array[require_node_info] nodes, String file_path, ?in_method: bool, ?in_class: bool) -> void
+      def ensure_load_paths: (Array[String] require_paths) -> void
       def collect_rbs_files: (Array[String] entry_paths) -> void
+      def collect_rbs_stdlib_files: () -> void
+      def load_rbs_from: (String dir) -> void
       def find_project_root: (Array[String] entry_paths) -> String?
       def resolve_relative_path: (String path, String from_file) -> String
       def resolve_bare_require: (String path) -> String?

@@ -219,6 +219,19 @@ class TestFileCollector < Minitest::Test
     end
   end
 
+  def test_rbs_files_collected_from_rbs_stdlib_for_gems
+    # When gem_names are provided, RBS stdlib definitions should be collected
+    Dir.mktmpdir do |tmpdir|
+      File.write(File.join(tmpdir, 'entry.rb'), 'require "json"')
+      File.write(File.join(tmpdir, 'Gemfile'), '')
+
+      graph = @collector.call(File.join(tmpdir, 'entry.rb'), gem_names: ['json'])
+      rbs_files = graph.rbs_files
+      json_rbs = rbs_files.keys.select { |path| path.include?('json') }
+      refute_empty json_rbs, "RBS stdlib definitions for json should be collected"
+    end
+  end
+
   def test_rbs_files_empty_when_no_sig_directory
     Dir.mktmpdir do |tmpdir|
       File.write(File.join(tmpdir, 'entry.rb'), 'X = 1')
@@ -269,5 +282,62 @@ class TestFileCollector < Minitest::Test
     assert entry, "single file should be collected"
     assert_equal [], entry.dependencies
     assert_equal [], entry.in_class_dependencies
+  end
+
+  def test_explicit_project_root_enables_bare_require_resolution
+    Dir.mktmpdir do |tmpdir|
+      lib_dir = File.join(tmpdir, 'lib')
+      Dir.mkdir(lib_dir)
+      File.write(File.join(lib_dir, 'helper.rb'), 'HELPER = 1')
+      File.write(File.join(lib_dir, 'entry.rb'), 'require "helper"')
+
+      $LOAD_PATH.unshift(lib_dir)
+      begin
+        # Without project_root: find_project_root returns nil (no Gemfile/.git)
+        # so bare requires are treated as stdlib
+        graph_without = @collector.call(File.join(lib_dir, 'entry.rb'))
+        entry_without = graph_without[File.join(lib_dir, 'entry.rb')]
+        stdlib_nodes = entry_without.require_nodes.select { |n| n[:type] == :require_stdlib }
+        assert_equal 1, stdlib_nodes.size, "Without project_root, bare require should be stdlib"
+
+        # With explicit project_root, bare requires under that root should be resolved
+        collector2 = RubyMinify::Pipeline::FileCollector.new
+        graph_with = collector2.call(File.join(lib_dir, 'entry.rb'), project_root: tmpdir)
+        helper_path = File.join(lib_dir, 'helper.rb')
+        assert graph_with[helper_path], "With project_root, bare require should be resolved"
+      ensure
+        $LOAD_PATH.delete(lib_dir)
+      end
+    end
+  end
+
+  def test_multiple_project_roots_resolve_bare_requires
+    Dir.mktmpdir do |tmpdir1|
+      Dir.mktmpdir do |tmpdir2|
+        lib1 = File.join(tmpdir1, 'lib')
+        lib2 = File.join(tmpdir2, 'lib')
+        Dir.mkdir(lib1)
+        Dir.mkdir(lib2)
+
+        File.write(File.join(lib1, 'entry.rb'), 'require "helper2"')
+        File.write(File.join(lib2, 'helper2.rb'), 'HELPER2 = 2')
+
+        $LOAD_PATH.unshift(lib1)
+        $LOAD_PATH.unshift(lib2)
+        begin
+          # With multiple project_roots, bare requires under any root should resolve
+          collector = RubyMinify::Pipeline::FileCollector.new
+          graph = collector.call(
+            File.join(lib1, 'entry.rb'),
+            project_root: [tmpdir1, tmpdir2]
+          )
+          helper2_path = File.join(lib2, 'helper2.rb')
+          assert graph[helper2_path], "Bare require under second project_root should be resolved"
+        ensure
+          $LOAD_PATH.delete(lib1)
+          $LOAD_PATH.delete(lib2)
+        end
+      end
+    end
   end
 end

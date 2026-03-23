@@ -12,7 +12,7 @@ module RubyMinify
       # @raise [FileNotFoundError] If a required file doesn't exist
       # @raise [NoFilesError] If entry_path is nil or empty
       # @raise [DynamicRequireError] If a dynamic require is detected
-      def call(entry_path)
+      def call(entry_path, project_root: nil, gem_names: [], gem_require_paths: [])
         raise NoFilesError.new if entry_path.nil?
 
         entry_paths = Array(entry_path)
@@ -20,7 +20,15 @@ module RubyMinify
 
         @graph = DependencyGraph.new
         @visited = Set.new
-        @project_root = find_project_root(entry_paths)
+        @gem_names = gem_names
+        @project_roots = if project_root
+          Array(project_root).map { |p| File.expand_path(p) }
+        else
+          root = find_project_root(entry_paths)
+          root ? [root] : []
+        end
+
+        ensure_load_paths(gem_require_paths)
 
         entry_paths.each do |path|
           expanded = File.expand_path(path)
@@ -233,13 +241,37 @@ module RubyMinify
         end
       end
 
+      def ensure_load_paths(require_paths)
+        require_paths.each do |path|
+          $LOAD_PATH.unshift(path) unless $LOAD_PATH.include?(path)
+        end
+      end
+
       def collect_rbs_files(_entry_paths)
-        return unless @project_root
+        @project_roots.each do |root|
+          load_rbs_from(File.join(root, "sig"))
+        end
 
-        sig_dir = File.join(@project_root, "sig")
-        return unless File.directory?(sig_dir)
+        collect_rbs_stdlib_files
+      end
 
-        Dir.glob(File.join(sig_dir, "**", "*.rbs")).each do |path|
+      def collect_rbs_stdlib_files
+        return if @gem_names.empty?
+
+        stdlib_root = RBS::Repository::DEFAULT_STDLIB_ROOT
+
+        @gem_names.each do |gem_name|
+          gem_rbs_dir = File.join(stdlib_root, gem_name)
+          versions = Dir.children(gem_rbs_dir) rescue next
+          next if versions.empty?
+
+          latest = versions.max_by { |v| Gem::Version.new(v) }
+          load_rbs_from(File.join(gem_rbs_dir, latest))
+        end
+      end
+
+      def load_rbs_from(dir)
+        Dir.glob(File.join(dir, "**", "*.rbs")).each do |path|
           @graph.rbs_files[path] = File.read(path)
         end
       end
@@ -259,14 +291,14 @@ module RubyMinify
       end
 
       # Resolve a bare require path (e.g., "foo") via $LOAD_PATH.
-      # Returns absolute path if the file is under the project root, nil otherwise.
+      # Returns absolute path if the file is under any project root, nil otherwise.
       def resolve_bare_require(path)
         result = $LOAD_PATH.resolve_feature_path(path)
         return nil unless result
 
         type, abs_path = result
         return nil unless type == :rb
-        return nil unless @project_root && abs_path.start_with?(@project_root)
+        return nil unless @project_roots.any? { |root| abs_path.start_with?("#{root}/") }
 
         abs_path
       end

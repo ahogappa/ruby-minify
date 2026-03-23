@@ -46,4 +46,15 @@ class TestPipelineErrors < Minitest::Test
     err = RubyMinify::Pipeline::NoFilesError.new
     assert_equal "No files provided. Please provide an entry point file.", err.message
   end
+
+  def test_gem_not_found_error
+    err = RubyMinify::Pipeline::GemNotFoundError.new("nonexistent_gem")
+    assert_equal "Gem not found: nonexistent_gem", err.message
+    assert_equal "nonexistent_gem", err.gem_name
+  end
+
+  def test_gem_not_found_is_stage_error
+    err = RubyMinify::Pipeline::GemNotFoundError.new("foo")
+    assert_kind_of RubyMinify::Pipeline::StageError, err
+  end
 end

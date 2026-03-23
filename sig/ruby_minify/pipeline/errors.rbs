@@ -28,5 +28,11 @@ module RubyMinify
     class NoFilesError < StageError
       def initialize: () -> void
     end
+
+    class GemNotFoundError < StageError
+      attr_reader gem_name: String
+
+      def initialize: (String gem_name) -> void
+    end
   end
 end

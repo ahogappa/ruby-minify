@@ -7,11 +7,12 @@ require_relative '../lib/ruby_minify'
 options = {
   output: nil,
   aliases: nil,
-  level: nil
+  level: nil,
+  gems: nil
 }
 
 parser = OptionParser.new do |opts|
-  opts.banner = "Usage: minify [options] FILE..."
+  opts.banner = "Usage: minify [options] [FILE...]"
 
   opts.on("-o", "--output FILE", "Write output to FILE instead of stdout") do |file|
     options[:output] = file
@@ -19,6 +20,10 @@ parser = OptionParser.new do |opts|
 
   opts.on("-a", "--aliases FILE", "Write constant alias declarations to FILE") do |file|
     options[:aliases] = file
+  end
+
+  opts.on("-g", "--gem GEM_NAMES", "Minify installed gem(s) by name (comma-separated)") do |names|
+    options[:gems] = names.split(',').map(&:strip).reject(&:empty?)
   end
 
   opts.on("-c", "--compress LEVEL", "Set compression level (0-5, stable, unstable)") do |value|
@@ -50,25 +55,53 @@ rescue OptionParser::InvalidOption => e
   exit 1
 end
 
-if ARGV.empty?
-  warn "Error: No entry file specified"
-  warn parser
-  exit 1
-end
-
-ARGV.each do |file|
-  unless File.exist?(file)
-    warn "Error: File not found: #{file}"
+if options[:gems]
+  unless ARGV.empty?
+    warn "Error: Cannot specify both --gem and file arguments"
     exit 1
   end
+
+  if options[:gems].empty?
+    warn "Error: No gem names specified"
+    exit 1
+  end
+
+  begin
+    resolver = RubyMinify::GemResolver.new
+    resolutions = options[:gems].map { |name| resolver.call(name) }
+    entry = resolutions.map(&:entry_path)
+    entry = entry.first if entry.size == 1
+    project_root = resolutions.map(&:project_root)
+    gem_require_paths = resolutions.flat_map(&:require_paths)
+  rescue RubyMinify::Pipeline::GemNotFoundError => e
+    warn "Error: #{e.message}"
+    exit 1
+  end
+else
+  if ARGV.empty?
+    warn "Error: No entry file specified"
+    warn parser
+    exit 1
+  end
+
+  ARGV.each do |file|
+    unless File.exist?(file)
+      warn "Error: File not found: #{file}"
+      exit 1
+    end
+  end
+
+  entry = ARGV.size == 1 ? ARGV[0] : ARGV.dup
+  project_root = nil
+  gem_require_paths = []
 end
 
-entry = ARGV.size == 1 ? ARGV[0] : ARGV.dup
+gem_names = options[:gems] || []
 
 begin
   minifier = RubyMinify::Minifier.new
   level_opts = options[:level] ? { level: options[:level] } : {}
-  result = minifier.call(entry, **level_opts)
+  result = minifier.call(entry, **level_opts, project_root: project_root, gem_names: gem_names, gem_require_paths: gem_require_paths)
 
   content = if options[:aliases]
     File.write(options[:aliases], result.aliases)
