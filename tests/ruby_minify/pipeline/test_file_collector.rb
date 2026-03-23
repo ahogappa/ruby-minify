@@ -297,4 +297,34 @@ class TestFileCollector < Minitest::Test
       end
     end
   end
+
+  def test_multiple_project_roots_resolve_bare_requires
+    Dir.mktmpdir do |tmpdir1|
+      Dir.mktmpdir do |tmpdir2|
+        lib1 = File.join(tmpdir1, 'lib')
+        lib2 = File.join(tmpdir2, 'lib')
+        Dir.mkdir(lib1)
+        Dir.mkdir(lib2)
+
+        File.write(File.join(lib1, 'entry.rb'), 'require "helper2"')
+        File.write(File.join(lib2, 'helper2.rb'), 'HELPER2 = 2')
+
+        $LOAD_PATH.unshift(lib1)
+        $LOAD_PATH.unshift(lib2)
+        begin
+          # With multiple project_roots, bare requires under any root should resolve
+          collector = RubyMinify::Pipeline::FileCollector.new
+          graph = collector.call(
+            File.join(lib1, 'entry.rb'),
+            project_root: [tmpdir1, tmpdir2]
+          )
+          helper2_path = File.join(lib2, 'helper2.rb')
+          assert graph[helper2_path], "Bare require under second project_root should be resolved"
+        ensure
+          $LOAD_PATH.delete(lib1)
+          $LOAD_PATH.delete(lib2)
+        end
+      end
+    end
+  end
 end

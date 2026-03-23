@@ -8,7 +8,7 @@ options = {
   output: nil,
   aliases: nil,
   level: nil,
-  gem: nil
+  gems: nil
 }
 
 parser = OptionParser.new do |opts|
@@ -22,8 +22,8 @@ parser = OptionParser.new do |opts|
     options[:aliases] = file
   end
 
-  opts.on("-g", "--gem GEM_NAME", "Minify an installed gem by name") do |name|
-    options[:gem] = name
+  opts.on("-g", "--gem GEM_NAMES", "Minify installed gem(s) by name (comma-separated)") do |names|
+    options[:gems] = names.split(',').map(&:strip)
   end
 
   opts.on("-c", "--compress LEVEL", "Set compression level (0-5, stable, unstable)") do |value|
@@ -55,16 +55,18 @@ rescue OptionParser::InvalidOption => e
   exit 1
 end
 
-if options[:gem]
+if options[:gems]
   unless ARGV.empty?
     warn "Error: Cannot specify both --gem and file arguments"
     exit 1
   end
 
   begin
-    resolution = RubyMinify::GemResolver.new.call(options[:gem])
-    entry = resolution.entry_path
-    project_root = resolution.project_root
+    resolver = RubyMinify::GemResolver.new
+    resolutions = options[:gems].map { |name| resolver.call(name) }
+    entry = resolutions.map(&:entry_path)
+    entry = entry.first if entry.size == 1
+    project_root = resolutions.map(&:project_root)
   rescue RubyMinify::Pipeline::GemNotFoundError => e
     warn "Error: #{e.message}"
     exit 1

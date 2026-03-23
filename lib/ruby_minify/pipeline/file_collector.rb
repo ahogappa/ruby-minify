@@ -20,7 +20,12 @@ module RubyMinify
 
         @graph = DependencyGraph.new
         @visited = Set.new
-        @project_root = project_root || find_project_root(entry_paths)
+        @project_roots = if project_root
+          Array(project_root)
+        else
+          root = find_project_root(entry_paths)
+          root ? [root] : []
+        end
 
         entry_paths.each do |path|
           expanded = File.expand_path(path)
@@ -234,13 +239,13 @@ module RubyMinify
       end
 
       def collect_rbs_files(_entry_paths)
-        return unless @project_root
+        @project_roots.each do |root|
+          sig_dir = File.join(root, "sig")
+          next unless File.directory?(sig_dir)
 
-        sig_dir = File.join(@project_root, "sig")
-        return unless File.directory?(sig_dir)
-
-        Dir.glob(File.join(sig_dir, "**", "*.rbs")).each do |path|
-          @graph.rbs_files[path] = File.read(path)
+          Dir.glob(File.join(sig_dir, "**", "*.rbs")).each do |path|
+            @graph.rbs_files[path] = File.read(path)
+          end
         end
       end
 
@@ -259,14 +264,14 @@ module RubyMinify
       end
 
       # Resolve a bare require path (e.g., "foo") via $LOAD_PATH.
-      # Returns absolute path if the file is under the project root, nil otherwise.
+      # Returns absolute path if the file is under any project root, nil otherwise.
       def resolve_bare_require(path)
         result = $LOAD_PATH.resolve_feature_path(path)
         return nil unless result
 
         type, abs_path = result
         return nil unless type == :rb
-        return nil unless @project_root && abs_path.start_with?(@project_root)
+        return nil unless @project_roots.any? { |root| abs_path.start_with?(root) }
 
         abs_path
       end
