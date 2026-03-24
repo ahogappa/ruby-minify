@@ -148,7 +148,8 @@ class TestGemMinification < Minitest::Test
       FileUtils.mkdir_p(File.dirname(minified_path))
       File.write(minified_path, content)
 
-      minified = run_gem_tests(test_files, tmpdir, test_runner: test_runner, gem_dir: gem_dir)
+      minified = run_gem_tests(test_files, tmpdir, test_runner: test_runner, gem_dir: gem_dir,
+                               replace_paths: resolution.require_paths)
       minified_count = parse_test_count(minified[:stdout])
       assert minified_count,
         "#{gem_name} L#{level}: no test summary found (minified code likely crashed)\nstderr: #{minified[:stderr][0, 300]}"
@@ -172,18 +173,30 @@ class TestGemMinification < Minitest::Test
     @baseline_cache ||= {}
   end
 
-  def run_gem_tests(test_files, lib_dir, test_runner: nil, gem_dir: nil)
+  def run_gem_tests(test_files, lib_dir, test_runner: nil, gem_dir: nil, replace_paths: [])
     test_files = Array(test_files)
     include_args = ["-I", lib_dir]
 
+    # Build a setup preamble that removes original gem paths and keeps lib_dir at front
+    setup_code = if replace_paths.any?
+      lines = replace_paths.map { |p| "$LOAD_PATH.delete(#{p.inspect})" }
+      lines << "$LOAD_PATH.unshift(#{lib_dir.inspect}) unless $LOAD_PATH[0] == #{lib_dir.inspect}"
+      lines.join('; ')
+    end
+
     if test_runner == :rspec
-      args = build_rspec_args(test_files, lib_dir, include_args)
+      args = build_rspec_args(test_files, lib_dir, include_args, setup_code: setup_code)
     elsif test_files.size == 1
-      args = [*include_args, test_files.first]
+      if setup_code
+        args = [*include_args, "-e", "#{setup_code}; load #{test_files.first.inspect}"]
+      else
+        args = [*include_args, test_files.first]
+      end
     else
       runner = Tempfile.new(['gem_test_runner', '.rb'])
+      preamble = setup_code ? "#{setup_code}\n" : ""
       runner.write(<<~RUBY)
-        minified_lib = #{lib_dir.inspect}
+        #{preamble}minified_lib = #{lib_dir.inspect}
         original_unshift = $LOAD_PATH.method(:unshift)
         $LOAD_PATH.define_singleton_method(:unshift) do |*args|
           original_unshift.call(*args)
@@ -243,11 +256,12 @@ class TestGemMinification < Minitest::Test
     @rspec_runner = nil
   end
 
-  def build_rspec_args(test_files, lib_dir, include_args)
+  def build_rspec_args(test_files, lib_dir, include_args, setup_code: nil)
     spec_dir = find_spec_dir(test_files.first)
     runner = Tempfile.new(['rspec_runner', '.rb'])
+    preamble = setup_code ? "#{setup_code}\n" : ""
     runner.write(<<~RUBY)
-      $LOAD_PATH.unshift(#{spec_dir.inspect}) if #{spec_dir.inspect}
+      #{preamble}$LOAD_PATH.unshift(#{spec_dir.inspect}) if #{spec_dir.inspect}
       require "rspec/core"
       exit(RSpec::Core::Runner.run(#{test_files.inspect} + ["--format", "progress", "--order", "defined", "--require", "spec_helper"]))
     RUBY

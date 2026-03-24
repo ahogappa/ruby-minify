@@ -2,5 +2,4 @@
 
 eval_gemfile "Gemfile"
 
-gem "sinatra", path: "gem_tests/sinatra"
-gem "rubocop", path: "gem_tests/rubocop"
+gem "sinatra"

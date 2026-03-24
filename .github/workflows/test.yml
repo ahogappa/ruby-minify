@@ -31,22 +31,28 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "4.0"
-      - name: Clone gem sources
+      - name: Install dependencies
+        run: bundle install --jobs 4
+      - name: Clone test suites matching installed gem versions
         run: |
           mkdir -p gem_tests
           cd gem_tests
-          git clone --depth 1 https://github.com/sinatra/sinatra
-          git clone --depth 1 https://github.com/rubocop/rubocop
-      - name: Install dependencies
-        run: bundle install --jobs 4
+          sinatra_version=$(bundle exec ruby -e 'puts Gem::Specification.find_by_name("sinatra").version')
+          rubocop_version=$(bundle exec ruby -e 'puts Gem::Specification.find_by_name("rubocop").version')
+          git clone --depth 1 --branch "v${sinatra_version}" https://github.com/sinatra/sinatra
+          git clone --depth 1 --branch "v${rubocop_version}" https://github.com/rubocop/rubocop
       - name: Install sinatra test dependencies
         working-directory: gem_tests/sinatra
-        run: bundle install --jobs 4
+        run: |
+          rm -rf lib
+          bundle install --jobs 4
         env:
           BUNDLE_GEMFILE: Gemfile
       - name: Install rubocop test dependencies
         working-directory: gem_tests/rubocop
-        run: bundle install --jobs 4
+        run: |
+          rm -rf lib
+          bundle install --jobs 4
         env:
           BUNDLE_GEMFILE: Gemfile
       - name: Run gem integration tests
