@@ -35,10 +35,10 @@ jobs:
         run: bundle install --jobs 4
       - name: Clone test suites matching installed gem versions
         run: |
-          mkdir -p gem_tests
-          cd gem_tests
           sinatra_version=$(bundle exec ruby -e 'puts Gem::Specification.find_by_name("sinatra").version')
           rubocop_version=$(bundle exec ruby -e 'puts Gem::Specification.find_by_name("rubocop").version')
+          mkdir -p gem_tests
+          cd gem_tests
           git clone --depth 1 --branch "v${sinatra_version}" https://github.com/sinatra/sinatra
           git clone --depth 1 --branch "v${rubocop_version}" https://github.com/rubocop/rubocop
       - name: Install sinatra test dependencies
