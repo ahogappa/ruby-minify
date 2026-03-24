@@ -212,10 +212,15 @@ class TestGemMinification < Minitest::Test
     gem_gemfile = gem_dir ? File.join(gem_dir, 'Gemfile') : nil
     pid = Bundler.with_unbundled_env do
       env = {}
-      env['BUNDLE_GEMFILE'] = gem_gemfile if gem_gemfile && File.exist?(gem_gemfile)
+      if gem_gemfile && File.exist?(gem_gemfile)
+        env['BUNDLE_GEMFILE'] = gem_gemfile
+        cmd = ['bundle', 'exec', RbConfig.ruby, *args]
+      else
+        cmd = [RbConfig.ruby, *args]
+      end
       spawn(
         env,
-        RbConfig.ruby, *args,
+        *cmd,
         chdir: work_dir,
         out: [stdout_file.path, 'w'],
         err: [stderr_file.path, 'w']
