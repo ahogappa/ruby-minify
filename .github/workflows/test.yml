@@ -44,23 +44,22 @@ jobs:
       - name: Prepare sinatra test environment
         working-directory: gem_tests/sinatra
         run: |
-          rm -rf lib
           cat > Gemfile.test <<GEMFILE
           source 'https://rubygems.org'
           gem 'sinatra'
           gem 'rack-test'
           gem 'rack-protection', path: 'rack-protection'
+          gem 'rackup'
           gem 'minitest', '~> 5.0'
           gem 'childprocess', '>= 5'
+          gem 'activesupport'
           GEMFILE
           bundle install --jobs 4
         env:
           BUNDLE_GEMFILE: Gemfile.test
       - name: Prepare rubocop test environment
         working-directory: gem_tests/rubocop
-        run: |
-          rm -rf lib
-          bundle install --jobs 4
+        run: bundle install --jobs 4
         env:
           BUNDLE_GEMFILE: Gemfile
       - name: Run gem integration tests
