@@ -141,6 +141,7 @@ module RubyMinify
 
     def build_result(rename_result, source)
       content = build_output(rename_result.code, source.stdlib_requires, rename_result.preamble)
+      content = break_long_lines(content)
       size = content.bytesize
 
       stats = Pipeline::CompressionStats.new(
@@ -163,6 +164,14 @@ module RubyMinify
       parts << preamble unless preamble.empty?
       parts << code
       parts.join(';')
+    end
+
+    MAX_LINE_LENGTH = 100_000
+
+    def break_long_lines(code)
+      return code unless code.lines.any? { |l| l.size > MAX_LINE_LENGTH }
+
+      code.gsub(/;end;/) { ";end\n" }
     end
   end
 end
