@@ -15,6 +15,7 @@ class TestGemMinification < Minitest::Test
   GEMS = {
     sinatra: {
       gem_name: 'sinatra',
+      test_gemfile: 'Gemfile.test',
       test_files: %w[
         sinatra/test/routing_test.rb
         sinatra/test/helpers_test.rb
@@ -97,13 +98,15 @@ class TestGemMinification < Minitest::Test
         test_files.each { |f| skip "gem test not found: #{f}" unless File.exist?(f) }
 
         gem_dir = File.join(GEM_TESTS_DIR, gem_key.to_s)
+        test_gemfile = config[:test_gemfile] || 'Gemfile'
         assert_minified_gem_passes(
           resolution: resolution,
           test_files: test_files,
           level: level,
           gem_name: gem_name,
           test_runner: config[:test_runner],
-          gem_dir: gem_dir
+          gem_dir: gem_dir,
+          test_gemfile: test_gemfile
         )
       end
     end
@@ -126,8 +129,8 @@ class TestGemMinification < Minitest::Test
     test_files
   end
 
-  def assert_minified_gem_passes(resolution:, test_files:, level:, gem_name:, test_runner: nil, gem_dir: nil)
-    baseline_failures = baseline_failures_for(gem_name, test_files, resolution, test_runner: test_runner, gem_dir: gem_dir)
+  def assert_minified_gem_passes(resolution:, test_files:, level:, gem_name:, test_runner: nil, gem_dir: nil, test_gemfile: 'Gemfile')
+    baseline_failures = baseline_failures_for(gem_name, test_files, resolution, test_runner: test_runner, gem_dir: gem_dir, test_gemfile: test_gemfile)
 
     minifier = RubyMinify::Minifier.new
     result = minifier.call(
@@ -149,7 +152,7 @@ class TestGemMinification < Minitest::Test
       File.write(minified_path, content)
 
       minified = run_gem_tests(test_files, tmpdir, test_runner: test_runner, gem_dir: gem_dir,
-                               replace_paths: resolution.require_paths)
+                               test_gemfile: test_gemfile, replace_paths: resolution.require_paths)
       minified_count = parse_test_count(minified[:stdout])
       assert minified_count,
         "#{gem_name} L#{level}: no test summary found (minified code likely crashed)\nstderr: #{minified[:stderr][0, 300]}"
@@ -161,11 +164,11 @@ class TestGemMinification < Minitest::Test
     end
   end
 
-  def baseline_failures_for(gem_name, test_files, resolution, test_runner: nil, gem_dir: nil)
+  def baseline_failures_for(gem_name, test_files, resolution, test_runner: nil, gem_dir: nil, test_gemfile: 'Gemfile')
     cache = self.class.baseline_cache
     return cache[gem_name] if cache.key?(gem_name)
 
-    baseline = run_gem_tests(test_files, resolution.require_paths.first, test_runner: test_runner, gem_dir: gem_dir)
+    baseline = run_gem_tests(test_files, resolution.require_paths.first, test_runner: test_runner, gem_dir: gem_dir, test_gemfile: test_gemfile)
     cache[gem_name] = parse_test_result(baseline[:stdout])
   end
 
@@ -173,7 +176,7 @@ class TestGemMinification < Minitest::Test
     @baseline_cache ||= {}
   end
 
-  def run_gem_tests(test_files, lib_dir, test_runner: nil, gem_dir: nil, replace_paths: [])
+  def run_gem_tests(test_files, lib_dir, test_runner: nil, gem_dir: nil, test_gemfile: 'Gemfile', replace_paths: [])
     test_files = Array(test_files)
     include_args = ["-I", lib_dir]
 
@@ -222,7 +225,7 @@ class TestGemMinification < Minitest::Test
     else
       File.dirname(test_files.first)
     end
-    gem_gemfile = gem_dir ? File.expand_path('Gemfile', gem_dir) : nil
+    gem_gemfile = gem_dir ? File.expand_path(test_gemfile, gem_dir) : nil
     pid = Bundler.with_unbundled_env do
       env = { 'BUNDLE_GEMFILE' => gem_gemfile }
       if gem_gemfile && File.exist?(gem_gemfile)

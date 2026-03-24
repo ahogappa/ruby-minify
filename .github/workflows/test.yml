@@ -41,14 +41,22 @@ jobs:
           cd gem_tests
           git clone --depth 1 --branch "v${sinatra_version}" https://github.com/sinatra/sinatra
           git clone --depth 1 --branch "v${rubocop_version}" https://github.com/rubocop/rubocop
-      - name: Install sinatra test dependencies
+      - name: Prepare sinatra test environment
         working-directory: gem_tests/sinatra
         run: |
           rm -rf lib
+          cat > Gemfile.test <<GEMFILE
+          source 'https://rubygems.org'
+          gem 'sinatra'
+          gem 'rack-test'
+          gem 'rack-protection', path: 'rack-protection'
+          gem 'minitest', '~> 5.0'
+          gem 'childprocess', '>= 5'
+          GEMFILE
           bundle install --jobs 4
         env:
-          BUNDLE_GEMFILE: Gemfile
-      - name: Install rubocop test dependencies
+          BUNDLE_GEMFILE: Gemfile.test
+      - name: Prepare rubocop test environment
         working-directory: gem_tests/rubocop
         run: |
           rm -rf lib
