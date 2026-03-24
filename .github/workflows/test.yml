@@ -23,7 +23,7 @@ jobs:
   external-gems:
     runs-on: ubuntu-latest
     continue-on-error: true
-    timeout-minutes: 40
+    timeout-minutes: 15
     env:
       BUNDLE_GEMFILE: Gemfile.gems_test
     steps:

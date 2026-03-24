@@ -151,9 +151,11 @@ class TestGemMinification < Minitest::Test
       FileUtils.mkdir_p(File.dirname(minified_path))
       File.write(minified_path, content)
 
+      $stderr.puts "[#{gem_name}] Running minified L#{level} tests..."
       minified = run_gem_tests(test_files, tmpdir, test_runner: test_runner, gem_dir: gem_dir,
                                test_gemfile: test_gemfile, replace_paths: resolution.require_paths)
       minified_count = parse_test_count(minified[:stdout])
+      $stderr.puts "[#{gem_name}] Minified L#{level}: #{minified_count || 'NO RESULT'} tests"
       assert minified_count,
         "#{gem_name} L#{level}: no test summary found (minified code likely crashed)\nstderr: #{minified[:stderr][0, 300]}"
       assert minified_count > 0, "#{gem_name} L#{level}: 0 tests ran"
@@ -168,7 +170,10 @@ class TestGemMinification < Minitest::Test
     cache = self.class.baseline_cache
     return cache[gem_name] if cache.key?(gem_name)
 
+    $stderr.puts "[#{gem_name}] Running baseline tests..."
     baseline = run_gem_tests(test_files, nil, test_runner: test_runner, gem_dir: gem_dir, test_gemfile: test_gemfile)
+    $stderr.puts "[#{gem_name}] Baseline: #{parse_test_count(baseline[:stdout]) || 'NO RESULT'} tests"
+    $stderr.puts "[#{gem_name}] Baseline stderr: #{baseline[:stderr][0, 200]}" unless baseline[:stderr].empty?
     cache[gem_name] = parse_test_result(baseline[:stdout])
   end
 
@@ -245,7 +250,7 @@ class TestGemMinification < Minitest::Test
         err: [stderr_file.path, 'w']
       )
     end
-    timeout = test_files.size > 10 ? 600 : 120
+    timeout = test_files.size > 10 ? 180 : 120
     waiter = Thread.new { Process.wait2(pid) }
     if waiter.join(timeout)
       { stdout: File.read(stdout_file.path), stderr: File.read(stderr_file.path), status: waiter.value[1] }
