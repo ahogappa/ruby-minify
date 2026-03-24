@@ -101,7 +101,7 @@ class TestGemMinification < Minitest::Test
           resolution: resolution,
           test_files: test_files,
           level: level,
-          gem_name: gem_key,
+          gem_name: gem_name,
           test_runner: config[:test_runner],
           gem_dir: gem_dir
         )
@@ -134,14 +134,16 @@ class TestGemMinification < Minitest::Test
       resolution.entry_path,
       level: level,
       project_root: resolution.project_root,
-      gem_names: [gem_name.to_s],
+      gem_names: [gem_name],
       gem_require_paths: resolution.require_paths
     )
 
     content = result.aliases.empty? ? result.content : "#{result.content};#{result.aliases}"
 
     Dir.mktmpdir("minify_gem_test") do |tmpdir|
-      relative = resolution.entry_path.delete_prefix("#{resolution.require_paths.first}/")
+      matching_root = resolution.require_paths.detect { |p| resolution.entry_path.start_with?("#{p}/") }
+      assert matching_root, "#{gem_name}: entry_path not under any require_path"
+      relative = resolution.entry_path.delete_prefix("#{matching_root}/")
       minified_path = File.join(tmpdir, relative)
       FileUtils.mkdir_p(File.dirname(minified_path))
       File.write(minified_path, content)
