@@ -385,8 +385,9 @@ module RubyMinify
           case node
           when TypeProf::Core::AST::ConstantReadNode
             key = AstUtils.location_key(node)
-            @const_resolution_map[key] = resolve_constant_read_cpath(node)
-            @const_full_path_map[key] = build_constant_path(node)
+            resolved = resolve_constant_read_cpath(node)
+            @const_resolution_map[key] = resolved
+            @const_full_path_map[key] = resolved || build_constant_path(node)
           when TypeProf::Core::AST::ConstantWriteNode
             @const_write_cpath_map[AstUtils.location_key(node)] = normalize_const_write_cpath(node)
           when TypeProf::Core::AST::ClassNode

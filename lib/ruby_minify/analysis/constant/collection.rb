@@ -187,10 +187,11 @@ module RubyMinify
       resolved_cpath = resolve_constant_read_cpath(node)
       is_user_defined = (full_path && @constant_mapping.user_defined_path?(full_path)) ||
                         (resolved_cpath && @constant_mapping.user_defined_path?(resolved_cpath))
-      if full_path && !is_user_defined
-        next if full_path.size < 2
-        next if @constant_mapping.has_user_defined_prefix?(full_path)
-        prefix = full_path[0...-1]
+      effective_path = resolved_cpath || full_path
+      if effective_path && !is_user_defined
+        next if effective_path.size < 2
+        next if full_path && @constant_mapping.has_user_defined_prefix?(full_path)
+        prefix = effective_path[0...-1]
         prefix_counts[prefix] += 1
       end
     end
