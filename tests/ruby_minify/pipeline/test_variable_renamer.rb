@@ -211,4 +211,11 @@ class TestVariableRenamer < Minitest::Test
     result = minify_at_level(code, 3)
     assert_equal 'class A;def m(a:) =a;end;def f(a,b) =(A.new.m(a:);A.new.m(a:b));puts f(1,2)', result.code
   end
+
+  def test_no_duplicated_argument_names_from_underscore_block_params
+    code = '[1].map{|_,b,_,_|b}'
+    result = minify_at_level(code, 3)
+    parsed = Prism.parse(result.code)
+    assert_empty parsed.errors.map(&:message), "Parse errors in: #{result.code}"
+  end
 end
