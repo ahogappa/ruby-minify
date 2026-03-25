@@ -177,7 +177,7 @@ module RubyMinify
         if line.size > MAX_LINE_LENGTH && line.include?(sep)
           result << line.gsub(sep, ";" + "end" + "\n")
         elsif line.size > MAX_LINE_LENGTH
-          result << line.gsub(";") { ";\n" }
+          result << line.gsub(";", ";\n")
         else
           result << line
         end

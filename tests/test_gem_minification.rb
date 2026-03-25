@@ -262,7 +262,9 @@ class TestGemMinification < Minitest::Test
       { stdout: File.read(stdout_file.path), stderr: "TIMEOUT after #{timeout}s\n" + File.read(stderr_file.path), status: nil }
     end
   ensure
+    stdout_file&.close
     stdout_file&.unlink
+    stderr_file&.close
     stderr_file&.unlink
     runner&.close!
     @rspec_runner&.close!
