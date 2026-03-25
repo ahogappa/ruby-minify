@@ -217,4 +217,10 @@ class TestVariableRenamer < Minitest::Test
     result = minify_at_level(code, 3)
     assert_equal '[1].map{|_,a,_,_|a}', result.code
   end
+
+  def test_underscore_prefixed_block_params_are_renamed
+    code = '[1].map{|_a,b|b+_a}'
+    result = minify_at_level(code, 3)
+    assert_equal '[1].map{_2+_1}', result.code
+  end
 end
