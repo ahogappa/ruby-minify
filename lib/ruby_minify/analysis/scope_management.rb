@@ -78,8 +78,7 @@ module RubyMinify
             mapping = {}
             node.block_f_args.each do |param|
               next unless param
-              next if param == :_
-              next if param.to_s.match?(/^_\d+$/)
+              next if param.to_s.match?(/^_\d*$/)
               mapping[param] = is_unsafe ? param.to_s : generator.next_name
             end
             node.block_multi_targets&.each_value do |mt|
