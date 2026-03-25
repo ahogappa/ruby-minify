@@ -40,12 +40,14 @@ module RubyMinify
         end
         generator = NameGenerator.new(reserved_names.uniq)
         mapping = {}
+        used_hint_names = Set.new
         node.tbl.each do |var|
           next if unused_rescue.include?(var)
           if keyword_params.include?(var)
             mapping[var] = kw_mapping&.[](var) || var.to_s
-          elsif !is_unsafe && var_hints.key?(var)
+          elsif !is_unsafe && var_hints.key?(var) && !used_hint_names.include?(var_hints[var])
             mapping[var] = var_hints[var]
+            used_hint_names << var_hints[var]
           else
             mapping[var] = is_unsafe ? var.to_s : generator.next_name
           end
