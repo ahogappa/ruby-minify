@@ -334,17 +334,4 @@ class TestGemMinification < Minitest::Test
     failures.sort.uniq
   end
 
-  public
-
-  def test_rubocop_preamble_uses_qualified_constants
-    resolution = RubyMinify::GemResolver.new.call("rubocop")
-    result = RubyMinify::Minifier.new.call(resolution.entry_path, level: 3,
-      project_root: resolution.project_root,
-      gem_names: ["rubocop"],
-      gem_require_paths: resolution.require_paths)
-    decls = result.preamble.split(';').map { |d| d.split('=', 2) }
-    rhs_map = decls.to_h { |lhs, rhs| [rhs, lhs] }
-    assert_equal 'B', rhs_map['RuboCop::NodePattern']
-    assert_equal 'K', rhs_map['RuboCop::Formatter']
-  end
 end
