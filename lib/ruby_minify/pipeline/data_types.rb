@@ -102,7 +102,7 @@ module RubyMinify
       :block_param_names_map,      # Hash<location_key, Hash<Symbol, String>>: pre-computed block param mangled names
       :syntax_data,                # Hash<[line,col], Hash>: Prism-derived syntax metadata
       :const_resolution_map,       # Hash<location_key, Array>: resolved constant cpaths
-      :const_full_path_map,        # Hash<location_key, Array>: syntactic constant paths
+      :const_full_path_map,        # Hash<location_key, Array>: resolved constant paths (fallback: syntactic)
       :const_write_cpath_map,      # Hash<location_key, Array>: normalized write cpaths
       :class_cpath_map,            # Hash<location_key, Array>: class/module cpaths
       :superclass_resolution_map,  # Hash<location_key, Array>: resolved superclass paths

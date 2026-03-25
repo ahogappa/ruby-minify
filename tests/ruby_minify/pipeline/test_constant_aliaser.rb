@@ -47,6 +47,35 @@ class TestConstantAliaserPipeline < Minitest::Test
                  result.code
   end
 
+  def test_external_prefix_uses_resolved_path_for_unqualified_refs
+    code = <<~RUBY
+      module Outer
+        module Other
+          class Worker
+            def run
+              Inner::Leaf.new
+              Inner::Leaf.new
+              Inner::Leaf.new
+            end
+          end
+        end
+      end
+    RUBY
+    rbs_files = { "outer.rbs" => <<~RBS }
+      module Outer
+        module Inner
+          class Leaf
+            def initialize: () -> void
+          end
+        end
+      end
+    RBS
+    result = minify_at_level(code, 2, verify_output: false, rbs_files: rbs_files)
+    assert_equal 'A=Outer::Inner', result.preamble
+    assert_equal 'module Outer;module Other;class Worker;def run =(A::Leaf.new;A::Leaf.new;A::Leaf.new);end;end;end',
+                 result.code
+  end
+
   def test_constant_path_write_and_superclass_renaming
     code = <<~RUBY
       module Framework
