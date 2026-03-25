@@ -333,5 +333,4 @@ class TestGemMinification < Minitest::Test
 
     failures.sort.uniq
   end
-
 end
