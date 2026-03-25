@@ -59,8 +59,7 @@ class TestGemMinification < Minitest::Test
       min_level: 3,
       max_level: 3,
     },
-    # rubocop: disabled — L3 minification produces syntax errors (duplicated argument names).
-    # See: https://github.com/ahogappa/ruby-minify/issues/TODO
+    # rubocop: disabled — L3 minification still produces 2 duplicated argument name errors.
     # rubocop: {
     #   gem_name: 'rubocop',
     #   test_file_patterns: ['rubocop/spec/rubocop/**/*_spec.rb'],
