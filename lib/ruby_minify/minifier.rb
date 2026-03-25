@@ -166,15 +166,18 @@ module RubyMinify
       parts.join(';')
     end
 
-    MAX_LINE_LENGTH = 100_000
+    MAX_LINE_LENGTH = 10_000
 
     def break_long_lines(code)
       return code unless code.lines.any? { |l| l.size > MAX_LINE_LENGTH }
 
+      sep = ";" + "end" + ";"
       result = +""
       code.each_line do |line|
-        if line.size > MAX_LINE_LENGTH
-          result << line.gsub(";" + "end" + ";", ";" + "end" + "\n")
+        if line.size > MAX_LINE_LENGTH && line.include?(sep)
+          result << line.gsub(sep, ";" + "end" + "\n")
+        elsif line.size > MAX_LINE_LENGTH
+          result << line.gsub(";") { ";\n" }
         else
           result << line
         end

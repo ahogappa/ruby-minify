@@ -59,7 +59,8 @@ class TestGemMinification < Minitest::Test
       min_level: 3,
       max_level: 3,
     },
-    # rubocop: disabled — L3 minification still produces 2 duplicated argument name errors.
+    # rubocop: disabled — preamble references unresolved top-level constants (e.g. E=NodePattern).
+    # See: https://github.com/ahogappa/ruby-minify/issues/18
     # rubocop: {
     #   gem_name: 'rubocop',
     #   test_file_patterns: ['rubocop/spec/rubocop/**/*_spec.rb'],
@@ -159,7 +160,7 @@ class TestGemMinification < Minitest::Test
       $stderr.puts "[#{gem_name}] Minified L#{level}: #{minified_count || 'NO RESULT'} tests"
       assert minified_count,
         "#{gem_name} L#{level}: no test summary found (minified code likely crashed)\nstderr: #{minified[:stderr][0, 300]}"
-      assert minified_count > 0, "#{gem_name} L#{level}: 0 tests ran"
+      assert minified_count > 0, "#{gem_name} L#{level}: 0 tests ran\nstdout: #{minified[:stdout][0, 500]}\nstderr: #{minified[:stderr][0, 500]}"
       minified_failures = parse_test_result(minified[:stdout])
       new_failures = minified_failures - baseline_failures
       assert new_failures.empty?,
