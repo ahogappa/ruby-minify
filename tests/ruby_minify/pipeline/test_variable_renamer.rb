@@ -203,4 +203,12 @@ class TestVariableRenamer < Minitest::Test
   def test_implicit_method_in_keyword_arg
     assert_equal L3_NO_VERIFY_EXPECTED, l3_no_verify_group.code
   end
+
+  # === Duplicated argument name regression ===
+
+  def test_no_duplicated_argument_names_from_var_hints
+    code = 'class A;def m(a:);a;end;end;def f(x,y);A.new.m(a:x);A.new.m(a:y);end;puts f(1,2)'
+    result = minify_at_level(code, 3)
+    refute_match(/def f\((\w+),\1\)/, result.code, "duplicated argument name in: #{result.code}")
+  end
 end
