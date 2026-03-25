@@ -171,7 +171,15 @@ module RubyMinify
     def break_long_lines(code)
       return code unless code.lines.any? { |l| l.size > MAX_LINE_LENGTH }
 
-      code.gsub(/;end;/) { ";end\n" }
+      result = +""
+      code.each_line do |line|
+        if line.size > MAX_LINE_LENGTH
+          result << line.gsub(";" + "end" + ";", ";" + "end" + "\n")
+        else
+          result << line
+        end
+      end
+      result
     end
   end
 end
