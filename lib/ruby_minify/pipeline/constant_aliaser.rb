@@ -73,6 +73,10 @@ module RubyMinify
           end
           loc = node.location
           patches << { start: loc.start_offset, end: loc.end_offset, replacement: short }
+        elsif node.is_a?(Prism::ConstantPathNode) && resolved_cpath &&
+              (short = build_renamed_via_user_prefix(node, analysis))
+          loc = node.location
+          patches << { start: loc.start_offset, end: loc.end_offset, replacement: short }
         elsif prefix_alias
           short = "#{prefix_alias}::#{node.name}"
           loc = node.location
@@ -156,6 +160,27 @@ module RubyMinify
           mark_constant_children(node.parent) if node.parent
         when Prism::ConstantReadNode
           @class_module_cpath_offsets << node.location.start_offset
+        end
+      end
+
+      def build_renamed_via_user_prefix(node, analysis)
+        parent_node = node.parent
+        return nil unless parent_node
+
+        parent_key = prism_location_key(parent_node)
+        parent_resolved = analysis.const_resolution_map[parent_key]
+        return nil unless parent_resolved
+
+        if analysis.constant_mapping.user_defined_path?(parent_resolved)
+          parent_short = if parent_node.is_a?(Prism::ConstantReadNode)
+            analysis.constant_mapping.short_name_for_path(parent_resolved) || parent_node.name.to_s
+          else
+            get_short_cpath(parent_resolved, analysis)
+          end
+          "#{parent_short}::#{node.name}"
+        elsif parent_node.is_a?(Prism::ConstantPathNode)
+          parent_renamed = build_renamed_via_user_prefix(parent_node, analysis)
+          parent_renamed ? "#{parent_renamed}::#{node.name}" : nil
         end
       end
 
