@@ -145,6 +145,43 @@ class TestConstantAliaserPipeline < Minitest::Test
     assert_equal '', result.preamble
   end
 
+  def test_unresolved_external_constant_inside_module_not_aliased_in_preamble
+    code = <<~RUBY
+      module RuboCopLike
+        module Cop
+          class AssignmentCheck
+            EQUALS = AST::Node::EQUALS_ASSIGNMENTS
+            EQUALS2 = AST::Node::EQUALS_ASSIGNMENTS
+            EQUALS3 = AST::Node::EQUALS_ASSIGNMENTS
+            def check(node)
+              EQUALS.include?(node.type) || EQUALS2.include?(node.type) || EQUALS3.include?(node.type)
+            end
+          end
+        end
+      end
+    RUBY
+    result = minify_at_level(code, 2, verify_output: false)
+    assert_equal '', result.preamble
+  end
+
+  def test_unresolved_top_level_external_constant_not_aliased_in_preamble
+    code = <<~RUBY
+      class Worker
+        def run
+          SomeGem::Config.load
+          SomeGem::Config.load
+          SomeGem::Config.load
+          SomeGem::Config.load
+          SomeGem::Config.load
+        end
+      end
+    RUBY
+    result = minify_at_level(code, 2, verify_output: false)
+    assert_equal '', result.preamble
+    assert_equal 'class Worker;def run =(SomeGem::Config.load;SomeGem::Config.load;SomeGem::Config.load;SomeGem::Config.load;SomeGem::Config.load);end',
+                 result.code
+  end
+
   def test_aliased_constant_references_are_renamed
     code = <<~RUBY
       module Outer
