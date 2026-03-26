@@ -201,12 +201,13 @@ class TestConcatenator < Minitest::Test
         content: main_content,
         deps: [], in_class_deps: ["/my_lib/formatter.rb"],
         require_nodes: [{ type: :autoload, path: "my_lib/formatter",
-                          line: 2, start_offset: 14, length: 43, in_class: true,
+                          line: 2, start_offset: 15, length: 39, in_class: true,
                           resolved_path: "/my_lib/formatter.rb" }]
       }
     )
     result = @concatenator.call(graph)
-    assert_equal false, result.content.include?("autoload")
+    expected = "module MyLib\n  class Formatter\n    def format(text)\n      text.upcase\n    end\n  end\n\n  class Runner\n    def run\n      Formatter.new.format(\"hello\")\n    end\n  end\nend"
+    assert_equal expected, result.content
   end
 
   def test_autoload_top_level_removed
@@ -218,13 +219,12 @@ class TestConcatenator < Minitest::Test
         content: main_content,
         deps: ["/formatter.rb"],
         require_nodes: [{ type: :autoload, path: "formatter",
-                          line: 1, start_offset: 0, length: 31,
+                          line: 1, start_offset: 0, length: 32,
                           resolved_path: "/formatter.rb" }]
       }
     )
     result = @concatenator.call(graph)
-    assert_equal false, result.content.include?("autoload")
-    assert_equal true, result.content.include?("puts 1")
+    assert_equal "class Formatter; end\nputs 1", result.content
   end
 
   private
