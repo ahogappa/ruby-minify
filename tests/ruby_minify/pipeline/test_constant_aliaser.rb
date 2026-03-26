@@ -145,6 +145,36 @@ class TestConstantAliaserPipeline < Minitest::Test
     assert_equal '', result.preamble
   end
 
+  def test_aliased_constant_references_are_renamed
+    code = <<~RUBY
+      module Outer
+        module External
+          module Macros
+            def helper; end
+          end
+        end
+        AliasConst = External
+        class Base
+          extend AliasConst::Macros
+        end
+        class Worker < Base
+          extend AliasConst::Macros
+        end
+        class Runner < Base
+          extend AliasConst::Macros
+        end
+      end
+    RUBY
+    result = minify_at_level(code, 2, verify_output: false)
+    assert_equal 'module Outer;module External;module Macros;def helper;end;end;end;' \
+                 'A=External;class Base;extend A::Macros;end;' \
+                 'class Worker<Outer::Base;extend A::Macros;end;' \
+                 'class Runner<Outer::Base;extend A::Macros;end;end',
+                 result.code
+    assert_equal 'Outer::AliasConst=Outer::A', result.aliases
+    assert_equal '', result.preamble
+  end
+
   def test_singleton_class_constant_not_renamed
     # Constants defined in `class << self` live on the metaclass —
     # they cannot be accessed as `Foo::X` from outside, so alias
