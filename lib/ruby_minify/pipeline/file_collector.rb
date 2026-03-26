@@ -229,6 +229,17 @@ module RubyMinify
               in_method: in_method,
               resolved_path: resolve_relative_path(path, file_path)
             }
+          elsif (resolved = resolve_bare_require(path))
+            nodes << {
+              type: :autoload,
+              path: path,
+              line: node.location.start_line,
+              start_offset: node.location.start_offset,
+              length: node.location.length,
+              in_class: in_class,
+              in_method: in_method,
+              resolved_path: resolved
+            }
           end
         else
           return if in_method

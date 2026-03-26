@@ -165,6 +165,23 @@ class TestFileCollector < Minitest::Test
     assert graph[helper_path], "autoloaded file should be collected"
   end
 
+  def test_autoload_with_bare_require_path_collects_dependency
+    fixture_dir = File.join(@fixtures_dir, 'autoload_bare_require_test')
+    entry_path = File.join(fixture_dir, 'main.rb')
+    formatter_path = File.join(fixture_dir, 'my_lib', 'formatter.rb')
+
+    $LOAD_PATH.unshift(fixture_dir)
+    begin
+      graph = @collector.call(entry_path, project_root: fixture_dir)
+      entry = graph[entry_path]
+      autoload_nodes = entry.require_nodes.select { |n| n[:type] == :autoload }
+      assert_equal 1, autoload_nodes.size
+      assert_equal formatter_path, autoload_nodes.first[:resolved_path]
+    ensure
+      $LOAD_PATH.delete(fixture_dir)
+    end
+  end
+
   def test_dynamic_autoload_at_top_level_raises
     Dir.mktmpdir do |tmpdir|
       File.write(File.join(tmpdir, 'entry.rb'), <<~RUBY)
