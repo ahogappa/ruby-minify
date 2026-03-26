@@ -142,8 +142,7 @@ class TestConstantAliaserPipeline < Minitest::Test
       end
     RUBY
     result = minify_at_level(code, 3, verify_output: false)
-    preamble_rhs = result.preamble.split(';').map { |d| d.split('=', 2).last }
-    assert_equal true, preamble_rhs.none? { |rhs| rhs.include?('AliasedInner') }
+    assert_equal '', result.preamble
   end
 
   def test_singleton_class_constant_not_renamed
