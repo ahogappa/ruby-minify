@@ -192,6 +192,7 @@ module RubyMinify
         next if effective_path.size < 2
         next if full_path && @constant_mapping.has_user_defined_prefix?(full_path)
         prefix = effective_path[0...-1]
+        next if @constant_mapping.user_defined_path?(prefix)
         prefix_counts[prefix] += 1
       end
     end
