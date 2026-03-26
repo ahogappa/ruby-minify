@@ -4,6 +4,7 @@ require 'minitest/autorun'
 require 'tempfile'
 require 'fileutils'
 require 'rbconfig'
+require 'securerandom'
 require_relative '../lib/ruby_minify'
 
 # Test that minified gems pass their own test suites.
@@ -143,6 +144,8 @@ class TestGemMinification < Minitest::Test
     )
 
     content = result.aliases.empty? ? result.content : "#{result.content};#{result.aliases}"
+    marker = "RUBY_MINIFY_MARKER_#{SecureRandom.hex(8)}"
+    content = "#{marker}=true;#{content}"
 
     Dir.mktmpdir("minify_gem_test") do |tmpdir|
       matching_root = resolution.require_paths.detect { |p| resolution.entry_path.start_with?("#{p}/") }
@@ -154,7 +157,8 @@ class TestGemMinification < Minitest::Test
 
       $stderr.puts "[#{gem_name}] Running minified L#{level} tests..."
       minified = run_gem_tests(test_files, tmpdir, test_runner: test_runner, gem_dir: gem_dir,
-                               test_gemfile: test_gemfile, replace_paths: resolution.require_paths)
+                               test_gemfile: test_gemfile, replace_paths: resolution.require_paths,
+                               marker: marker)
       minified_count = parse_test_count(minified[:stdout])
       $stderr.puts "[#{gem_name}] Minified L#{level}: #{minified_count || 'NO RESULT'} tests"
       assert minified_count,
@@ -182,7 +186,7 @@ class TestGemMinification < Minitest::Test
     @baseline_cache ||= {}
   end
 
-  def run_gem_tests(test_files, lib_dir, test_runner: nil, gem_dir: nil, test_gemfile: 'Gemfile', replace_paths: [])
+  def run_gem_tests(test_files, lib_dir, test_runner: nil, gem_dir: nil, test_gemfile: 'Gemfile', replace_paths: [], marker: nil)
     test_files = Array(test_files)
     include_args = lib_dir ? ["-I", lib_dir] : []
 
@@ -190,6 +194,9 @@ class TestGemMinification < Minitest::Test
     setup_code = if replace_paths.any? && lib_dir
       lines = replace_paths.map { |p| "$LOAD_PATH.delete(#{p.inspect})" }
       lines << "$LOAD_PATH.unshift(#{lib_dir.inspect}) unless $LOAD_PATH[0] == #{lib_dir.inspect}"
+      if marker
+        lines << "at_exit { abort %q(MINIFY_MARKER_MISSING: loaded non-minified code!) unless defined?(#{marker}) }"
+      end
       lines.join('; ')
     end
 
