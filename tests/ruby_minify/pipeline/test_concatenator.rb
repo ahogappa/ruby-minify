@@ -192,6 +192,41 @@ class TestConcatenator < Minitest::Test
     assert_equal({ "/a.rbs" => "class A; end" }, result.rbs_files)
   end
 
+  def test_autoload_declaration_removed_when_dependency_inlined
+    formatter_content = "module MyLib\n  class Formatter\n    def format(text)\n      text.upcase\n    end\n  end\nend"
+    main_content = "module MyLib\n  autoload :Formatter, \"my_lib/formatter\"\n\n  class Runner\n    def run\n      Formatter.new.format(\"hello\")\n    end\n  end\nend"
+    graph = build_graph(
+      "/my_lib/formatter.rb" => { content: formatter_content, deps: [] },
+      "/main.rb" => {
+        content: main_content,
+        deps: [], in_class_deps: ["/my_lib/formatter.rb"],
+        require_nodes: [{ type: :autoload, path: "my_lib/formatter",
+                          line: 2, start_offset: 14, length: 43, in_class: true,
+                          resolved_path: "/my_lib/formatter.rb" }]
+      }
+    )
+    result = @concatenator.call(graph)
+    assert_equal false, result.content.include?("autoload")
+  end
+
+  def test_autoload_top_level_removed
+    formatter_content = "class Formatter; end"
+    main_content = "autoload :Formatter, \"formatter\"\nputs 1"
+    graph = build_graph(
+      "/formatter.rb" => { content: formatter_content, deps: [] },
+      "/main.rb" => {
+        content: main_content,
+        deps: ["/formatter.rb"],
+        require_nodes: [{ type: :autoload, path: "formatter",
+                          line: 1, start_offset: 0, length: 31,
+                          resolved_path: "/formatter.rb" }]
+      }
+    )
+    result = @concatenator.call(graph)
+    assert_equal false, result.content.include?("autoload")
+    assert_equal true, result.content.include?("puts 1")
+  end
+
   private
 
   def build_graph(files)
