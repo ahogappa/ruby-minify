@@ -193,6 +193,7 @@ DEPENDENCIES
   debug
   minitest
   rake (~> 13.0)
+  rubocop
   ruby-minify!
   simplecov
   sinatra

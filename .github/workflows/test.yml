@@ -36,9 +36,25 @@ jobs:
       - name: Clone test suites matching installed gem versions
         run: |
           sinatra_version=$(bundle exec ruby -e 'puts Gem::Specification.find_by_name("sinatra").version')
+          rubocop_version=$(bundle exec ruby -e 'puts Gem::Specification.find_by_name("rubocop").version')
           mkdir -p gem_tests
           cd gem_tests
           git clone --depth 1 --branch "v${sinatra_version}" https://github.com/sinatra/sinatra
+          git clone --depth 1 --branch "v${rubocop_version}" https://github.com/rubocop/rubocop
+      - name: Prepare rubocop test environment
+        working-directory: gem_tests/rubocop
+        run: |
+          cat > Gemfile.test <<GEMFILE
+          source 'https://rubygems.org'
+          gem 'rubocop', path: '.'
+          gem 'rspec', '~> 3.7'
+          gem 'webmock'
+          gem 'mcp', '~> 0.6'
+          gem 'rake'
+          GEMFILE
+          bundle install --jobs 4
+        env:
+          BUNDLE_GEMFILE: Gemfile.test
       - name: Prepare sinatra test environment
         working-directory: gem_tests/sinatra
         run: |

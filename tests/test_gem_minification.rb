@@ -59,27 +59,26 @@ class TestGemMinification < Minitest::Test
       min_level: 3,
       max_level: 3,
     },
-    # rubocop: disabled — preamble references unresolved top-level constants (e.g. E=NodePattern).
-    # See: https://github.com/ahogappa/ruby-minify/issues/18
-    # rubocop: {
-    #   gem_name: 'rubocop',
-    #   test_file_patterns: ['rubocop/spec/rubocop/**/*_spec.rb'],
-    #   exclude_test_patterns: %w[
-    #     rubocop/spec/rubocop/server/**/*_spec.rb
-    #     rubocop/spec/rubocop/cli/**/*_spec.rb
-    #   ],
-    #   exclude_test_files: %w[
-    #     rubocop/spec/rubocop/cops_documentation_generator_spec.rb
-    #     rubocop/spec/rubocop/runner_spec.rb
-    #     rubocop/spec/rubocop/cli_spec.rb
-    #     rubocop/spec/rubocop/lsp/server_spec.rb
-    #     rubocop/spec/rubocop/mcp/server_spec.rb
-    #     rubocop/spec/rubocop/runner_formatter_invocation_spec.rb
-    #   ],
-    #   test_runner: :rspec,
-    #   min_level: 3,
-    #   max_level: 3,
-    # }
+    rubocop: {
+      gem_name: 'rubocop',
+      test_gemfile: 'Gemfile.test',
+      test_file_patterns: ['rubocop/spec/rubocop/**/*_spec.rb'],
+      exclude_test_patterns: %w[
+        rubocop/spec/rubocop/server/**/*_spec.rb
+        rubocop/spec/rubocop/cli/**/*_spec.rb
+      ],
+      exclude_test_files: %w[
+        rubocop/spec/rubocop/cops_documentation_generator_spec.rb
+        rubocop/spec/rubocop/runner_spec.rb
+        rubocop/spec/rubocop/cli_spec.rb
+        rubocop/spec/rubocop/lsp/server_spec.rb
+        rubocop/spec/rubocop/mcp/server_spec.rb
+        rubocop/spec/rubocop/runner_formatter_invocation_spec.rb
+      ],
+      test_runner: :rspec,
+      min_level: 3,
+      max_level: 3,
+    }
   }.freeze
 
   GEMS.each do |gem_key, config|

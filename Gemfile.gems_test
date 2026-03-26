@@ -3,3 +3,4 @@
 eval_gemfile "Gemfile"
 
 gem "sinatra"
+gem "rubocop"
