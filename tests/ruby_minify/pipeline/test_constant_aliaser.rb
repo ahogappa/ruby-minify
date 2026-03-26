@@ -122,6 +122,30 @@ class TestConstantAliaserPipeline < Minitest::Test
     assert_equal 'Formatter::SEPARATOR=Formatter::A', result.aliases
   end
 
+  def test_aliased_constant_prefix_not_in_preamble
+    code = <<~RUBY
+      module Outer
+        module Inner
+          class Leaf
+          end
+        end
+        AliasedInner = Inner
+        module Consumer
+          class Worker
+            def run
+              AliasedInner::Leaf.new
+              AliasedInner::Leaf.new
+              AliasedInner::Leaf.new
+            end
+          end
+        end
+      end
+    RUBY
+    result = minify_at_level(code, 3, verify_output: false)
+    preamble_rhs = result.preamble.split(';').map { |d| d.split('=', 2).last }
+    assert_equal true, preamble_rhs.none? { |rhs| rhs.include?('AliasedInner') }
+  end
+
   def test_singleton_class_constant_not_renamed
     # Constants defined in `class << self` live on the metaclass —
     # they cannot be accessed as `Foo::X` from outside, so alias
