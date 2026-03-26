@@ -46,7 +46,7 @@ jobs:
         run: |
           cat > Gemfile.test <<GEMFILE
           source 'https://rubygems.org'
-          gem 'rubocop', path: '.'
+          gem 'rubocop'
           gem 'rspec', '~> 3.7'
           gem 'webmock'
           gem 'mcp', '~> 0.6'
