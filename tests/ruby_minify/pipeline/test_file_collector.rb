@@ -166,30 +166,19 @@ class TestFileCollector < Minitest::Test
   end
 
   def test_autoload_with_bare_require_path_collects_dependency
-    Dir.mktmpdir do |tmpdir|
-      lib_dir = File.join(tmpdir, 'lib')
-      sub_dir = File.join(lib_dir, 'my_lib')
-      Dir.mkdir(lib_dir)
-      Dir.mkdir(sub_dir)
-      File.write(File.join(tmpdir, 'Gemfile'), '')
-      File.write(File.join(sub_dir, 'formatter.rb'), 'class Formatter; end')
-      File.write(File.join(lib_dir, 'entry.rb'), <<~RUBY)
-        module MyLib
-          autoload :Formatter, "my_lib/formatter"
-        end
-      RUBY
+    fixture_dir = File.join(@fixtures_dir, 'autoload_bare_require_test')
+    entry_path = File.join(fixture_dir, 'main.rb')
+    formatter_path = File.join(fixture_dir, 'my_lib', 'formatter.rb')
 
-      $LOAD_PATH.unshift(lib_dir)
-      begin
-        graph = @collector.call(File.join(lib_dir, 'entry.rb'), project_root: tmpdir)
-        formatter_path = File.join(sub_dir, 'formatter.rb')
-        entry = graph[File.join(lib_dir, 'entry.rb')]
-        autoload_nodes = entry.require_nodes.select { |n| n[:type] == :autoload }
-        assert_equal 1, autoload_nodes.size
-        assert_equal formatter_path, autoload_nodes.first[:resolved_path]
-      ensure
-        $LOAD_PATH.delete(lib_dir)
-      end
+    $LOAD_PATH.unshift(fixture_dir)
+    begin
+      graph = @collector.call(entry_path, project_root: fixture_dir)
+      entry = graph[entry_path]
+      autoload_nodes = entry.require_nodes.select { |n| n[:type] == :autoload }
+      assert_equal 1, autoload_nodes.size
+      assert_equal formatter_path, autoload_nodes.first[:resolved_path]
+    ensure
+      $LOAD_PATH.delete(fixture_dir)
     end
   end
 
