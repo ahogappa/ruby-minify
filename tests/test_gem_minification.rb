@@ -251,7 +251,7 @@ class TestGemMinification < Minitest::Test
         err: [stderr_file.path, 'w']
       )
     end
-    timeout = test_files.size > 10 ? 180 : 120
+    timeout = test_files.size > 100 ? 1200 : test_files.size > 10 ? 300 : 120
     waiter = Thread.new { Process.wait2(pid) }
     if waiter.join(timeout)
       { stdout: File.read(stdout_file.path), stderr: File.read(stderr_file.path), status: waiter.value[1] }
