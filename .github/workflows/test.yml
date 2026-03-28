@@ -23,24 +23,53 @@ jobs:
   external-gems:
     runs-on: ubuntu-latest
     continue-on-error: true
-    timeout-minutes: 40
+    timeout-minutes: 30
+    env:
+      BUNDLE_GEMFILE: Gemfile.gems_test
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "4.0"
-          bundler-cache: true
-      - name: Clone gem sources
+      - name: Install dependencies
+        run: bundle install --jobs 4
+      - name: Clone test suites matching installed gem versions
         run: |
+          sinatra_version=$(bundle exec ruby -e 'puts Gem::Specification.find_by_name("sinatra").version')
+          rubocop_version=$(bundle exec ruby -e 'puts Gem::Specification.find_by_name("rubocop").version')
           mkdir -p gem_tests
           cd gem_tests
-          git clone --depth 1 https://github.com/sinatra/sinatra
-          git clone --depth 1 https://github.com/rubocop/rubocop
-      - name: Install sinatra test dependencies
-        working-directory: gem_tests/sinatra
-        run: bundle install --jobs 4
-      - name: Install rubocop test dependencies
+          git clone --depth 1 --branch "v${sinatra_version}" https://github.com/sinatra/sinatra
+          git clone --depth 1 --branch "v${rubocop_version}" https://github.com/rubocop/rubocop
+      - name: Prepare rubocop test environment
         working-directory: gem_tests/rubocop
-        run: bundle install --jobs 4
+        run: |
+          cat > Gemfile.test <<GEMFILE
+          source 'https://rubygems.org'
+          gem 'rubocop'
+          gem 'rspec', '~> 3.7'
+          gem 'webmock'
+          gem 'mcp', '~> 0.6'
+          gem 'rake'
+          GEMFILE
+          bundle install --jobs 4
+        env:
+          BUNDLE_GEMFILE: Gemfile.test
+      - name: Prepare sinatra test environment
+        working-directory: gem_tests/sinatra
+        run: |
+          cat > Gemfile.test <<GEMFILE
+          source 'https://rubygems.org'
+          gem 'sinatra'
+          gem 'rack-test'
+          gem 'rack-protection', path: 'rack-protection'
+          gem 'rackup'
+          gem 'minitest', '~> 5.0'
+          gem 'childprocess', '>= 5'
+          gem 'activesupport'
+          GEMFILE
+          bundle install --jobs 4
+        env:
+          BUNDLE_GEMFILE: Gemfile.test
       - name: Run gem integration tests
         run: bundle exec rake test:gems
