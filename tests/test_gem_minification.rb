@@ -1,15 +1,14 @@
 # frozen_string_literal: true
 
 require 'minitest/autorun'
-require 'tempfile'
 require 'fileutils'
 require 'rbconfig'
 require 'securerandom'
+require 'tempfile'
 require_relative '../lib/ruby_minify'
 
 # Test that minified gems pass their own test suites.
-# Excluded from default `rake test` — run with `rake test:gems`.
-# Requires BUNDLE_GEMFILE=Gemfile.gems_test so target gems are available.
+# Run with: BUNDLE_GEMFILE=Gemfile.gems_test bundle exec rake test:gems
 class TestGemMinification < Minitest::Test
   GEM_TESTS_DIR = File.expand_path('../gem_tests', __dir__)
 
@@ -17,312 +16,167 @@ class TestGemMinification < Minitest::Test
     sinatra: {
       gem_name: 'sinatra',
       test_gemfile: 'Gemfile.test',
-      test_files: %w[
-        sinatra/test/routing_test.rb
-        sinatra/test/helpers_test.rb
-        sinatra/test/settings_test.rb
-        sinatra/test/filter_test.rb
-        sinatra/test/request_test.rb
-        sinatra/test/response_test.rb
-        sinatra/test/result_test.rb
-        sinatra/test/base_test.rb
-        sinatra/test/delegator_test.rb
-        sinatra/test/streaming_test.rb
-        sinatra/test/middleware_test.rb
-        sinatra/test/sinatra_test.rb
-        sinatra/test/server_test.rb
-        sinatra/test/static_test.rb
-        sinatra/test/extensions_test.rb
-        sinatra/test/mapped_error_test.rb
-        sinatra/test/templates_test.rb
-        sinatra/test/route_added_hook_test.rb
-        sinatra/test/compile_test.rb
-        sinatra/test/host_authorization_test.rb
-        sinatra/test/indifferent_hash_test.rb
-        sinatra/test/rack_test.rb
-        sinatra/test/readme_test.rb
-        sinatra/test/erb_test.rb
-        sinatra/test/rdoc_test.rb
-        sinatra/test/liquid_test.rb
-        sinatra/test/encoding_test.rb
-        sinatra/test/asciidoctor_test.rb
-        sinatra/test/builder_test.rb
-        sinatra/test/haml_test.rb
-        sinatra/test/markaby_test.rb
-        sinatra/test/markdown_test.rb
-        sinatra/test/nokogiri_test.rb
-        sinatra/test/rabl_test.rb
-        sinatra/test/sass_test.rb
-        sinatra/test/scss_test.rb
-        sinatra/test/slim_test.rb
-        sinatra/test/yajl_test.rb
-      ],
-      min_level: 3,
-      max_level: 3,
+      test_patterns: ['sinatra/test/*_test.rb'],
+      exclude_patterns: ['sinatra/test/integration*_test.rb'],
+      levels: [3],
     },
     rubocop: {
       gem_name: 'rubocop',
       test_gemfile: 'Gemfile.test',
-      test_file_patterns: ['rubocop/spec/rubocop/**/*_spec.rb'],
-      exclude_test_patterns: %w[
-        rubocop/spec/rubocop/server/**/*_spec.rb
-        rubocop/spec/rubocop/cli/**/*_spec.rb
-      ],
-      exclude_test_files: %w[
-        rubocop/spec/rubocop/cops_documentation_generator_spec.rb
-        rubocop/spec/rubocop/runner_spec.rb
-        rubocop/spec/rubocop/cli_spec.rb
-        rubocop/spec/rubocop/lsp/server_spec.rb
-        rubocop/spec/rubocop/mcp/server_spec.rb
-        rubocop/spec/rubocop/runner_formatter_invocation_spec.rb
+      test_patterns: ['rubocop/spec/rubocop/**/*_spec.rb'],
+      exclude_patterns: [
+        'rubocop/spec/rubocop/{server,cli}/**/*_spec.rb',
+        'rubocop/spec/rubocop/cops_documentation_generator_spec.rb',
+        'rubocop/spec/rubocop/runner_spec.rb',
+        'rubocop/spec/rubocop/cli_spec.rb',
+        'rubocop/spec/rubocop/lsp/server_spec.rb',
+        'rubocop/spec/rubocop/mcp/server_spec.rb',
+        'rubocop/spec/rubocop/runner_formatter_invocation_spec.rb',
       ],
       test_runner: :rspec,
-      min_level: 3,
-      max_level: 3,
-    }
+      levels: [3],
+    },
   }.freeze
 
   GEMS.each do |gem_key, config|
-    min_level = config[:min_level] || 0
-    max_level = config[:max_level] || 5
-    (min_level..max_level).each do |level|
+    Array(config[:levels]).each do |level|
       define_method(:"test_#{gem_key}_level#{level}") do
-        gem_name = config[:gem_name]
-
-        begin
-          resolution = RubyMinify::GemResolver.new.call(gem_name)
-        rescue RubyMinify::Pipeline::GemNotFoundError
-          skip "#{gem_name} gem not available (use BUNDLE_GEMFILE=Gemfile.gems_test)"
-        end
-
-        test_files = resolve_test_files(config)
-        skip "no test files found for #{gem_name} (clone repos into gem_tests/)" if test_files.empty?
-        test_files.each { |f| skip "gem test not found: #{f}" unless File.exist?(f) }
+        resolution = resolve_gem(config[:gem_name])
+        test_files = collect_test_files(config)
+        skip "no test files for #{config[:gem_name]}" if test_files.empty?
 
         gem_dir = File.join(GEM_TESTS_DIR, gem_key.to_s)
-        test_gemfile = config[:test_gemfile] || 'Gemfile'
-        assert_minified_gem_passes(
-          resolution: resolution,
-          test_files: test_files,
-          level: level,
-          gem_name: gem_name,
-          test_runner: config[:test_runner],
-          gem_dir: gem_dir,
-          test_gemfile: test_gemfile
-        )
+        baseline_failures = run_baseline(config, test_files, gem_dir)
+
+        content, marker = minify_gem(config[:gem_name], resolution, level)
+        Dir.mktmpdir("minify_gem_test") do |tmpdir|
+          write_minified(tmpdir, resolution, content)
+
+          $stderr.puts "[#{config[:gem_name]}] Running minified L#{level} tests..."
+          stdout, = run_test_suite(test_files, config, gem_dir, lib_dir: tmpdir,
+                                   replace_paths: resolution.require_paths, marker: marker)
+          count = parse_test_count(stdout)
+          $stderr.puts "[#{config[:gem_name]}] Minified L#{level}: #{count || 'NO RESULT'} tests"
+
+          assert count, "#{config[:gem_name]} L#{level}: tests crashed\nstdout: #{stdout[0, 500]}"
+          assert count > 0, "#{config[:gem_name]} L#{level}: 0 tests ran"
+          new_failures = parse_failures(stdout) - baseline_failures
+          assert_equal [], new_failures,
+            "#{config[:gem_name]} L#{level}: #{new_failures.size} new failure(s)"
+        end
       end
     end
   end
 
   private
 
-  def resolve_test_files(config)
-    test_files = Array(config[:test_files]).map { |f| File.join(GEM_TESTS_DIR, f) }
-    if config[:test_file_patterns]
-      excludes = Array(config[:exclude_test_files]).map { |f| File.join(GEM_TESTS_DIR, f) }
-      Array(config[:exclude_test_patterns]).each do |pat|
-        excludes.concat(Dir.glob(File.join(GEM_TESTS_DIR, pat)))
-      end
-      config[:test_file_patterns].each do |pattern|
-        test_files.concat(Dir.glob(File.join(GEM_TESTS_DIR, pattern)) - excludes)
-      end
-      test_files.uniq!
-    end
-    test_files
+  def resolve_gem(gem_name)
+    RubyMinify::GemResolver.new.call(gem_name)
+  rescue RubyMinify::Pipeline::GemNotFoundError
+    skip "#{gem_name} gem not available (use BUNDLE_GEMFILE=Gemfile.gems_test)"
   end
 
-  def assert_minified_gem_passes(resolution:, test_files:, level:, gem_name:, test_runner: nil, gem_dir: nil, test_gemfile: 'Gemfile')
-    baseline_failures = baseline_failures_for(gem_name, test_files, resolution, test_runner: test_runner, gem_dir: gem_dir, test_gemfile: test_gemfile)
+  def collect_test_files(config)
+    files = Array(config[:test_patterns]).flat_map { |p| Dir.glob(File.join(GEM_TESTS_DIR, p)) }
+    excludes = Array(config[:exclude_patterns]).flat_map { |p| Dir.glob(File.join(GEM_TESTS_DIR, p)) }
+    (files - excludes).sort
+  end
 
-    minifier = RubyMinify::Minifier.new
-    result = minifier.call(
-      resolution.entry_path,
-      level: level,
+  def minify_gem(gem_name, resolution, level)
+    result = RubyMinify::Minifier.new.call(
+      resolution.entry_path, level: level,
       project_root: resolution.project_root,
-      gem_names: [gem_name],
-      gem_require_paths: resolution.require_paths
+      gem_names: [gem_name], gem_require_paths: resolution.require_paths
     )
-
-    content = result.aliases.empty? ? result.content : "#{result.content};#{result.aliases}"
     marker = "RUBY_MINIFY_MARKER_#{SecureRandom.hex(8)}"
-    content = "#{marker}=true;#{content}"
-
-    Dir.mktmpdir("minify_gem_test") do |tmpdir|
-      matching_root = resolution.require_paths.detect { |p| resolution.entry_path.start_with?("#{p}/") }
-      assert matching_root, "#{gem_name}: entry_path not under any require_path"
-      relative = resolution.entry_path.delete_prefix("#{matching_root}/")
-      minified_path = File.join(tmpdir, relative)
-      FileUtils.mkdir_p(File.dirname(minified_path))
-      File.write(minified_path, content)
-
-      $stderr.puts "[#{gem_name}] Running minified L#{level} tests..."
-      minified = run_gem_tests(test_files, tmpdir, test_runner: test_runner, gem_dir: gem_dir,
-                               test_gemfile: test_gemfile, replace_paths: resolution.require_paths,
-                               marker: marker)
-      minified_count = parse_test_count(minified[:stdout])
-      $stderr.puts "[#{gem_name}] Minified L#{level}: #{minified_count || 'NO RESULT'} tests"
-      assert minified_count,
-        "#{gem_name} L#{level}: no test summary found (minified code likely crashed)\nstderr: #{minified[:stderr][0, 300]}"
-      assert minified_count > 0, "#{gem_name} L#{level}: 0 tests ran\nstdout: #{minified[:stdout][0, 500]}\nstderr: #{minified[:stderr][0, 500]}"
-      minified_failures = parse_test_result(minified[:stdout])
-      new_failures = minified_failures - baseline_failures
-      assert new_failures.empty?,
-        "#{gem_name} L#{level}: #{new_failures.size} new failure(s) (not in baseline):\n#{new_failures.join("\n")}"
-    end
+    content = "#{marker}=true;#{result.content}"
+    content += ";#{result.aliases}" unless result.aliases.empty?
+    [content, marker]
   end
 
-  def baseline_failures_for(gem_name, test_files, resolution, test_runner: nil, gem_dir: nil, test_gemfile: 'Gemfile')
-    cache = self.class.baseline_cache
-    return cache[gem_name] if cache.key?(gem_name)
+  def write_minified(tmpdir, resolution, content)
+    root = resolution.require_paths.detect { |p| resolution.entry_path.start_with?("#{p}/") }
+    path = File.join(tmpdir, resolution.entry_path.delete_prefix("#{root}/"))
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, content)
+  end
+
+  # --- Baseline ---
+
+  @@baseline_cache = {} # rubocop:disable Style/ClassVars
+
+  def run_baseline(config, test_files, gem_dir)
+    gem_name = config[:gem_name]
+    return @@baseline_cache[gem_name] if @@baseline_cache.key?(gem_name)
 
     $stderr.puts "[#{gem_name}] Running baseline tests..."
-    baseline = run_gem_tests(test_files, nil, test_runner: test_runner, gem_dir: gem_dir, test_gemfile: test_gemfile)
-    $stderr.puts "[#{gem_name}] Baseline: #{parse_test_count(baseline[:stdout]) || 'NO RESULT'} tests"
-    $stderr.puts "[#{gem_name}] Baseline stderr: #{baseline[:stderr][0, 200]}" unless baseline[:stderr].empty?
-    cache[gem_name] = parse_test_result(baseline[:stdout])
+    stdout, stderr = run_test_suite(test_files, config, gem_dir)
+    $stderr.puts "[#{gem_name}] Baseline: #{parse_test_count(stdout) || 'NO RESULT'} tests"
+    $stderr.puts "[#{gem_name}] Baseline stderr: #{stderr[0, 200]}" unless stderr.empty?
+    @@baseline_cache[gem_name] = parse_failures(stdout)
   end
 
-  def self.baseline_cache
-    @baseline_cache ||= {}
+  # --- Subprocess ---
+
+  def run_test_suite(test_files, config, gem_dir, lib_dir: nil, replace_paths: [], marker: nil)
+    Tempfile.create(['runner', '.rb']) do |f|
+      write_runner_script(f, test_files, config, lib_dir: lib_dir,
+                          replace_paths: replace_paths, marker: marker)
+      f.close
+      gemfile = File.join(gem_dir, config[:test_gemfile] || 'Gemfile')
+      cmd = ['bundle', 'exec', RbConfig.ruby]
+      cmd += ['-I', lib_dir] if lib_dir
+      cmd << f.path
+      timeout = test_files.size > 100 ? 1200 : 300
+      capture_process({ 'BUNDLE_GEMFILE' => gemfile }, *cmd, chdir: gem_dir, timeout: timeout)
+    end
   end
 
-  def run_gem_tests(test_files, lib_dir, test_runner: nil, gem_dir: nil, test_gemfile: 'Gemfile', replace_paths: [], marker: nil)
-    test_files = Array(test_files)
-    include_args = lib_dir ? ["-I", lib_dir] : []
-
-    # Build a setup preamble that removes original gem paths and keeps lib_dir at front
-    setup_code = if replace_paths.any? && lib_dir
-      lines = replace_paths.map { |p| "$LOAD_PATH.delete(#{p.inspect})" }
-      lines << "$LOAD_PATH.unshift(#{lib_dir.inspect}) unless $LOAD_PATH[0] == #{lib_dir.inspect}"
-      if marker
-        lines << "at_exit { abort %q(MINIFY_MARKER_MISSING: loaded non-minified code!) unless defined?(#{marker}) }"
-      end
-      lines.join('; ')
+  def write_runner_script(f, test_files, config, lib_dir:, replace_paths:, marker:)
+    if lib_dir && replace_paths.any?
+      replace_paths.each { |p| f.puts "$LOAD_PATH.delete(#{p.inspect})" }
+      f.puts "$LOAD_PATH.unshift(#{lib_dir.inspect}) unless $LOAD_PATH[0] == #{lib_dir.inspect}"
+      f.puts "at_exit { abort 'MINIFY_MARKER_MISSING' unless defined?(#{marker}) }" if marker
     end
-
-    if test_runner == :rspec
-      args = build_rspec_args(test_files, lib_dir, include_args, setup_code: setup_code)
-    elsif test_files.size == 1
-      if setup_code
-        args = [*include_args, "-e", "#{setup_code}; load #{test_files.first.inspect}"]
-      else
-        args = [*include_args, test_files.first]
-      end
+    if config[:test_runner] == :rspec
+      spec_dir = test_files.first.then { |p| p[%r{.*/spec}] }
+      f.puts "$LOAD_PATH.unshift(#{spec_dir.inspect})" if spec_dir
+      f.puts 'require "rspec/core"'
+      f.puts "exit(RSpec::Core::Runner.run(#{test_files.inspect} + %w[--format progress --order defined --require spec_helper]))"
     else
-      runner = Tempfile.new(['gem_test_runner', '.rb'])
-      if setup_code
-        runner.write(<<~RUBY)
-          #{setup_code}
-          minified_lib = #{lib_dir.inspect}
-          original_unshift = $LOAD_PATH.method(:unshift)
-          $LOAD_PATH.define_singleton_method(:unshift) do |*args|
-            original_unshift.call(*args)
-            if $LOAD_PATH.index(minified_lib) != 0
-              $LOAD_PATH.delete(minified_lib)
-              original_unshift.call(minified_lib)
-            end
-            self
-          end
-          #{test_files.map { |f| "require #{f.inspect}" }.join("\n")}
-        RUBY
-      else
-        runner.write(test_files.map { |f| "require #{f.inspect}" }.join("\n"))
-      end
-      runner.flush
-      args = [*include_args, runner.path]
+      test_files.each { |tf| f.puts "require #{tf.inspect}" }
     end
-    stdout_file = Tempfile.new('gem_test_stdout')
-    stderr_file = Tempfile.new('gem_test_stderr')
-    stdout_file.close
-    stderr_file.close
-    work_dir = if gem_dir
-      gem_dir
-    elsif test_runner == :rspec
-      find_spec_dir(test_files.first) || File.dirname(test_files.first)
-    else
-      File.dirname(test_files.first)
-    end
-    gem_gemfile = gem_dir ? File.expand_path(test_gemfile, gem_dir) : nil
+    f.flush
+  end
+
+  def capture_process(env, *cmd, chdir:, timeout:)
+    out = Tempfile.new('stdout')
+    err = Tempfile.new('stderr')
     pid = Bundler.with_unbundled_env do
-      env = { 'BUNDLE_GEMFILE' => gem_gemfile }
-      if gem_gemfile && File.exist?(gem_gemfile)
-        cmd = ['bundle', 'exec', RbConfig.ruby, *args]
-      else
-        cmd = [RbConfig.ruby, *args]
-      end
-      spawn(
-        env,
-        *cmd,
-        chdir: work_dir,
-        out: [stdout_file.path, 'w'],
-        err: [stderr_file.path, 'w']
-      )
+      spawn(env, *cmd, chdir: chdir, out: [out.path, 'w'], err: [err.path, 'w'])
     end
-    timeout = test_files.size > 100 ? 1200 : test_files.size > 10 ? 300 : 120
-    waiter = Thread.new { Process.wait2(pid) }
-    if waiter.join(timeout)
-      { stdout: File.read(stdout_file.path), stderr: File.read(stderr_file.path), status: waiter.value[1] }
-    else
+    waiter = Thread.new { Process.waitpid(pid) }
+    unless waiter.join(timeout)
       Process.kill('TERM', pid)
-      waiter.join
-      { stdout: File.read(stdout_file.path), stderr: "TIMEOUT after #{timeout}s\n" + File.read(stderr_file.path), status: nil }
+      waiter.join(5)
     end
+    [File.read(out.path), File.read(err.path)]
   ensure
-    stdout_file&.close
-    stdout_file&.unlink
-    stderr_file&.close
-    stderr_file&.unlink
-    runner&.close!
-    @rspec_runner&.close!
-    @rspec_runner = nil
+    out&.close!
+    err&.close!
   end
 
-  def build_rspec_args(test_files, lib_dir, include_args, setup_code: nil)
-    spec_dir = find_spec_dir(test_files.first)
-    runner = Tempfile.new(['rspec_runner', '.rb'])
-    preamble = setup_code ? "#{setup_code}\n" : ""
-    runner.write(<<~RUBY)
-      #{preamble}$LOAD_PATH.unshift(#{spec_dir.inspect}) if #{!spec_dir.nil?}
-      require "rspec/core"
-      exit(RSpec::Core::Runner.run(#{test_files.inspect} + ["--format", "progress", "--order", "defined", "--require", "spec_helper"]))
-    RUBY
-    runner.flush
-    @rspec_runner = runner
-    [*include_args, runner.path]
-  end
-
-  def find_spec_dir(test_file)
-    dir = File.dirname(test_file)
-    until dir == '/' || dir == '.'
-      return dir if File.basename(dir) == 'spec'
-      dir = File.dirname(dir)
-    end
-    nil
-  end
+  # --- Parsing ---
 
   def parse_test_count(output)
-    if output =~ /(\d+) (?:runs?|tests?),/
-      $1.to_i
-    elsif output =~ /(\d+) examples?,/
-      $1.to_i
-    end
+    $1.to_i if output =~ /(\d+) (?:runs?|tests?|examples?),/
   end
 
-  def parse_test_result(output)
+  def parse_failures(output)
     failures = []
-
-    output.scan(/^(?:Failure|Error): (\S+)\((\S+)\)/) do |test_name, klass|
-      failures << "#{klass}##{test_name}"
-    end
-
-    output.scan(/^\s+\d+\) (?:Failure|Error):\n(\S+#\S+)/) do |match|
-      failures << match[0]
-    end
-
-    output.scan(/^rspec (\S+:\d+)/) do |match|
-      failures << match[0]
-    end
-
+    output.scan(/^(?:Failure|Error): (\S+)\((\S+)\)/) { |n, k| failures << "#{k}##{n}" }
+    output.scan(/^\s+\d+\) (?:Failure|Error):\n(\S+#\S+)/) { |m| failures << m[0] }
+    output.scan(/^rspec (\S+:\d+)/) { |m| failures << m[0] }
     failures.sort.uniq
   end
 end
